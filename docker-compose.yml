@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: enterprise-demo-postgres
+    environment:
+      POSTGRES_DB: enterprise_demo
+      POSTGRES_USER: enterprise
+      POSTGRES_PASSWORD: enterprise
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U enterprise -d enterprise_demo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: enterprise-demo-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:
