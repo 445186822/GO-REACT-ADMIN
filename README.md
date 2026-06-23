@@ -28,7 +28,7 @@ This repository is organized as a monorepo:
 
 - `backend/`: Go + Echo API service, migrations, OpenAPI, and backend runtime configuration.
 - `frontend/`: React + Vite admin app and frontend build configuration.
-- `enterprise_demo_docs/`: planning and implementation reference documents.
+- `enterprise_demo_docs/`: current product documentation for API, database, and frontend behavior.
 - `docker-compose.yml`: shared local infrastructure for PostgreSQL and Redis.
 
 Root-level files are shared repository or infrastructure files. Backend runtime environment files live under `backend/`.
@@ -88,6 +88,6 @@ http://localhost:5173
 
 Login with the real `admin` account and the password configured by `INITIAL_ADMIN_PASSWORD` during first initialization.
 
-## Not Yet Complete
+## Extension Rule
 
-The planning docs include additional modules such as orders, tasks, approvals, WebSocket notifications, and AI chat. These are not exposed as finished features until they have real tables, APIs, frontend pages, permissions, and tests.
+Additional modules such as orders, tasks, approvals, WebSocket notifications, and AI chat may be added later. They must not be exposed in routes, menus, OpenAPI, or product documentation until they have real tables, APIs, frontend pages, permissions, and verification.
