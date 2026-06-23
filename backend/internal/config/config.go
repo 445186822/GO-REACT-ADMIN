@@ -20,7 +20,6 @@ type Config struct {
 
 func Load() Config {
 	loadDotEnv(".env")
-	loadDotEnv("../.env")
 
 	return Config{
 		AppName:              getEnv("APP_NAME", "Enterprise Demo"),

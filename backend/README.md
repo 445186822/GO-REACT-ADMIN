@@ -24,4 +24,4 @@ api/openapi.yaml
 
 ## Environment
 
-Runtime configuration is loaded from `backend/.env` when the backend is started from this directory. For compatibility with older local setups, the loader also reads `../.env` if present.
+Runtime configuration is loaded from `backend/.env` when the backend is started from this directory.

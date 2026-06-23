@@ -31,7 +31,7 @@ This repository is organized as a monorepo:
 - `enterprise_demo_docs/`: planning and implementation reference documents.
 - `docker-compose.yml`: shared local infrastructure for PostgreSQL and Redis.
 
-Root-level files are shared repository or infrastructure files. Backend runtime environment examples live under `backend/`.
+Root-level files are shared repository or infrastructure files. Backend runtime environment files live under `backend/`.
 
 ## Environment
 
