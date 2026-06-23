@@ -28,7 +28,7 @@ Last updated: 2026-06-23
 - Real WebSocket notification system with notification table and business event triggers.
 - Real AI chat with conversation persistence and actual streaming model/provider integration.
 - Automated backend and frontend test coverage beyond build/package checks.
-- Backend-generated `.xlsx` export endpoints for large datasets.
+- Backend-generated `.xlsx` export endpoints for the remaining list pages beyond customers.
 
 ## Runtime Visibility Rule
 

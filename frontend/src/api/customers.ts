@@ -27,6 +27,18 @@ export async function listCustomers(params: { keyword?: string; page?: number; p
   return res.data;
 }
 
+export async function exportCustomers(): Promise<void> {
+  const blob = await http.post<unknown, Blob>('/customers/export', {}, { responseType: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `customers_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export async function createCustomer(payload: CustomerForm): Promise<{ id: number }> {
   const res = await http.post<unknown, { data: { id: number } }>('/customers', payload);
   return res.data;

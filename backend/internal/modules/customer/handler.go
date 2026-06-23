@@ -1,9 +1,12 @@
 package customer
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
+	"enterprise-demo/backend/internal/exportxlsx"
 	"enterprise-demo/backend/internal/http/middleware"
 	"enterprise-demo/backend/internal/http/response"
 
@@ -24,6 +27,7 @@ func (h *Handler) Register(g *echo.Group) {
 	group := g.Group("/customers", middleware.Auth(h.jwtSecret))
 	group.GET("", h.List)
 	group.POST("", h.Create)
+	group.POST("/export", h.Export)
 	group.PUT("/:id", h.Update)
 	group.DELETE("/:id", h.Delete)
 }
@@ -38,6 +42,10 @@ type Row struct {
 	Department string  `json:"department"`
 	Status     string  `json:"status"`
 	Remark     *string `json:"remark"`
+}
+
+type ExportRequest struct {
+	Keyword string `json:"keyword"`
 }
 
 func (h *Handler) List(c echo.Context) error {
@@ -83,6 +91,72 @@ LIMIT $5 OFFSET $6`, keyword, scope, deptID, userID, pageSize, offset)
 		items = append(items, item)
 	}
 	return response.OK(c, response.Page[Row]{Items: items, Page: page, PageSize: pageSize, Total: total})
+}
+
+func (h *Handler) Export(c echo.Context) error {
+	userID := middleware.CurrentUserID(c)
+	var req ExportRequest
+	if err := c.Bind(&req); err != nil {
+		return err
+	}
+
+	scope, deptID, err := h.dataScope(c, userID)
+	if err != nil {
+		return err
+	}
+
+	rows, err := h.db.Query(c.Request().Context(), `
+SELECT bc.id, bc.name, bc.level, bc.phone, bc.email, u.display_name, d.name, bc.status, bc.remark
+FROM biz_customers bc
+JOIN sys_users u ON u.id = bc.owner_id
+JOIN sys_departments d ON d.id = bc.department_id
+WHERE bc.deleted_at IS NULL
+  AND ($1 = '' OR bc.name ILIKE '%' || $1 || '%')
+  AND ($2 = 'ALL' OR ($2 = 'DEPT' AND bc.department_id = $3) OR ($2 = 'SELF' AND bc.owner_id = $4))
+ORDER BY bc.created_at DESC
+LIMIT 10000`, req.Keyword, scope, deptID, userID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	sheetRows := [][]string{{
+		"ID",
+		"客户名称",
+		"级别",
+		"手机",
+		"邮箱",
+		"负责人",
+		"部门",
+		"状态",
+		"备注",
+	}}
+	for rows.Next() {
+		var item Row
+		if err := rows.Scan(&item.ID, &item.Name, &item.Level, &item.Phone, &item.Email, &item.Owner, &item.Department, &item.Status, &item.Remark); err != nil {
+			return err
+		}
+		sheetRows = append(sheetRows, []string{
+			strconv.FormatInt(item.ID, 10),
+			item.Name,
+			levelText(item.Level),
+			stringValue(item.Phone),
+			stringValue(item.Email),
+			item.Owner,
+			item.Department,
+			statusText(item.Status),
+			stringValue(item.Remark),
+		})
+	}
+
+	content, err := exportxlsx.Build("Customers", sheetRows)
+	if err != nil {
+		return err
+	}
+
+	filename := fmt.Sprintf("customers_%s.xlsx", time.Now().Format("20060102_150405"))
+	c.Response().Header().Set(echo.HeaderContentDisposition, fmt.Sprintf(`attachment; filename="%s"`, filename))
+	return c.Blob(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", content)
 }
 
 func (h *Handler) Create(c echo.Context) error {
@@ -182,4 +256,29 @@ func pagination(c echo.Context) (int64, int64) {
 		pageSize = 20
 	}
 	return page, pageSize
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func levelText(level string) string {
+	switch level {
+	case "IMPORTANT":
+		return "重点客户"
+	case "POTENTIAL":
+		return "潜在客户"
+	default:
+		return "普通客户"
+	}
+}
+
+func statusText(status string) string {
+	if status == "ACTIVE" {
+		return "有效"
+	}
+	return "停用"
 }

@@ -13,14 +13,14 @@ import { useRef, useState } from 'react';
 import {
   createCustomer,
   deleteCustomer,
+  exportCustomers,
   listCustomers,
   updateCustomer,
   type CustomerForm,
   type CustomerRow,
 } from '../../../api/customers';
+import { BackendDownloadButton } from '../../../components/BackendDownloadButton';
 import { Permission } from '../../../components/Permission';
-import { ExportButton } from '../../../components/ExportButton';
-import { exportExcel } from '../../../utils/exportExcel';
 
 export function CustomerListPage() {
   const actionRef = useRef<ActionType>(null);
@@ -109,24 +109,8 @@ export function CustomerListPage() {
     return true;
   }
 
-  async function exportCustomers() {
-    const data = await listCustomers({ page: 1, page_size: 10000 });
-    await exportExcel<CustomerRow>(
-      'customers.xlsx',
-      'Customers',
-      [
-        { title: 'ID', dataIndex: 'id' },
-        { title: '客户名称', dataIndex: 'name' },
-        { title: '级别', dataIndex: 'level', render: (_, row) => levelText(row.level) },
-        { title: '手机', dataIndex: 'phone' },
-        { title: '邮箱', dataIndex: 'email' },
-        { title: '负责人', dataIndex: 'owner' },
-        { title: '部门', dataIndex: 'department' },
-        { title: '状态', dataIndex: 'status' },
-        { title: '备注', dataIndex: 'remark' },
-      ],
-      data.items,
-    );
+  async function handleExportCustomers() {
+    await exportCustomers();
     message.success('客户 Excel 已生成');
   }
 
@@ -148,9 +132,9 @@ export function CustomerListPage() {
         }}
         pagination={{ defaultPageSize: 10, showSizeChanger: false }}
         toolBarRender={() => [
-          <ExportButton key="export" onClick={exportCustomers}>
+          <BackendDownloadButton key="export" onClick={handleExportCustomers}>
             导出 Excel
-          </ExportButton>,
+          </BackendDownloadButton>,
           <Permission code="customer:create" key="create">
             <Button
               type="primary"

@@ -95,6 +95,17 @@ paths:
       responses:
         "201":
           description: Created customer ID
+  /customers/export:
+    post:
+      summary: Export customers as backend-generated XLSX
+      responses:
+        "200":
+          description: XLSX file stream
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
   /customers/{id}:
     put:
       summary: Update customer
