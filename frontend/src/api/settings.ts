@@ -20,7 +20,7 @@ export type SettingForm = {
   is_encrypted?: boolean;
 };
 
-export async function listSettings(params?: { group_key?: string }): Promise<SettingRow[]> {
+export async function listSettings(params?: { group_key?: string; keyword?: string }): Promise<SettingRow[]> {
   const res = await http.get<unknown, { data: SettingRow[] }>('/settings', { params });
   return res.data;
 }

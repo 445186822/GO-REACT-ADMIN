@@ -1,19 +1,16 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { useEffect, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { meApi } from '../api/auth';
 import { BasicLayout } from '../layouts/BasicLayout';
-import { AuditLogPage } from '../features/auditlog/pages/AuditLogPage';
 import { LoginPage } from '../features/auth/pages/LoginPage';
 import { NotFoundPage } from '../features/common/NotFoundPage';
-import { CustomerListPage } from '../features/customer/pages/CustomerListPage';
-import { DashboardPage } from '../features/dashboard/pages/DashboardPage';
-import { DepartmentListPage } from '../features/department/pages/DepartmentListPage';
-import { FileCenterPage } from '../features/file/pages/FileCenterPage';
-import { MenuListPage } from '../features/menu/pages/MenuListPage';
-import { RoleListPage } from '../features/role/pages/RoleListPage';
-import { SettingsPage } from '../features/settings/pages/SettingsPage';
-import { UserListPage } from '../features/user/pages/UserListPage';
 import { useAuthStore } from '../store/authStore';
+import { enterpriseRoutes } from './lazyRoutes';
+
+const lazyRouteComponents = enterpriseRoutes.map((route) => ({
+  ...route,
+  Component: lazy(route.loader),
+}));
 
 function AuthBootstrap({ children }: { children: ReactNode }) {
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -69,6 +66,10 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return children;
 }
 
+function LazyPage({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<div className="app-loading">页面加载中...</div>}>{children}</Suspense>;
+}
+
 export function AppRouter() {
   return (
     <AuthBootstrap>
@@ -84,15 +85,17 @@ export function AppRouter() {
             }
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="system/users" element={<UserListPage />} />
-            <Route path="system/roles" element={<RoleListPage />} />
-            <Route path="system/menus" element={<MenuListPage />} />
-            <Route path="system/departments" element={<DepartmentListPage />} />
-            <Route path="business/customers" element={<CustomerListPage />} />
-            <Route path="files" element={<FileCenterPage />} />
-            <Route path="logs/operation" element={<AuditLogPage />} />
-            <Route path="settings" element={<SettingsPage />} />
+            {lazyRouteComponents.map(({ path, Component }) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <LazyPage>
+                    <Component />
+                  </LazyPage>
+                }
+              />
+            ))}
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>

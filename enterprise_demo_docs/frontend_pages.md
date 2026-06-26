@@ -17,6 +17,11 @@ Do not add placeholder routes. If a module is not backed by real database tables
 - `/system/menus`: menu/permission list and frontend XLSX export.
 - `/system/departments`: department list and frontend XLSX export.
 - `/business/customers`: customer CRUD, data-scope API integration, backend XLSX export.
+- `/collaboration/notifications`: persisted notification list, unread state, read actions, create notification, and WebSocket unread updates.
+- `/collaboration/message-templates`: message template CRUD with JSON variables.
+- `/collaboration/approvals`: approval template management, approval instance submission, approve, and reject actions.
+- `/collaboration/workflows`: workflow definition CRUD, manual run, and run instance list.
+- `/collaboration/ai-assistant`: persisted AI chat messages and real provider forwarding through backend configuration.
 - `/files`: upload, list, backend file download, soft delete, frontend file-list XLSX export.
 - `/logs/operation`: audit log list and frontend XLSX export.
 - `/settings`: list and upsert settings, frontend XLSX export.

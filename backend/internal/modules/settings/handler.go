@@ -21,7 +21,7 @@ func NewHandler(db *pgxpool.Pool, jwtSecret string) *Handler {
 }
 
 func (h *Handler) Register(g *echo.Group) {
-	group := g.Group("/settings", middleware.Auth(h.jwtSecret))
+	group := g.Group("/settings", middleware.Auth(h.jwtSecret), middleware.RequirePermission(h.db))
 	group.GET("", h.List)
 	group.PUT("/:key", h.Upsert)
 }
@@ -47,11 +47,13 @@ type UpsertRequest struct {
 
 func (h *Handler) List(c echo.Context) error {
 	groupKey := c.QueryParam("group_key")
+	keyword := c.QueryParam("keyword")
 	rows, err := h.db.Query(c.Request().Context(), `
 SELECT id, group_key, setting_key, setting_value, value_type, description, is_encrypted, updated_at
 FROM sys_settings
 WHERE ($1 = '' OR group_key = $1)
-ORDER BY group_key, setting_key`, groupKey)
+  AND ($2 = '' OR setting_key ILIKE '%' || $2 || '%' OR setting_value ILIKE '%' || $2 || '%' OR COALESCE(description, '') ILIKE '%' || $2 || '%')
+ORDER BY group_key, setting_key`, groupKey, keyword)
 	if err != nil {
 		return err
 	}

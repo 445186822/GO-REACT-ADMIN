@@ -1,6 +1,6 @@
 ﻿import { DeleteOutlined, UploadOutlined } from '@ant-design/icons';
 import { ProColumns, ProTable, type ActionType } from '@ant-design/pro-components';
-import { Button, Modal, Space, Tag, Typography, Upload, message } from 'antd';
+import { App, Button, Space, Tag, Typography, Upload, message } from 'antd';
 import { useRef } from 'react';
 import { deleteFile, downloadFile, listFiles, uploadFile, type FileRow } from '../../../api/files';
 import { Permission } from '../../../components/Permission';
@@ -9,6 +9,7 @@ import { ExportButton } from '../../../components/ExportButton';
 import { exportExcel } from '../../../utils/exportExcel';
 
 export function FileCenterPage() {
+  const { modal } = App.useApp();
   const actionRef = useRef<ActionType>(null);
 
   const columns: ProColumns<FileRow>[] = [
@@ -46,7 +47,7 @@ export function FileCenterPage() {
   ];
 
   function confirmDelete(row: FileRow) {
-    Modal.confirm({
+    modal.confirm({
       title: `删除 ${row.original_name}?`,
       okText: '删除',
       okButtonProps: { danger: true },

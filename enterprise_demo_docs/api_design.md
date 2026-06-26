@@ -12,6 +12,8 @@ The backend exposes authenticated REST APIs under `/api/v1`. Responses use a uni
 
 Errors use the same envelope with an HTTP status and stable error code.
 
+Authenticated business APIs enforce backend permission codes derived from the request route and method. Frontend button visibility is only a usability layer; direct API calls still require the matching menu or button permission.
+
 ## Public Health
 
 - `GET /health`
@@ -49,8 +51,34 @@ Errors use the same envelope with an HTTP status and stable error code.
 - `DELETE /api/v1/files/{id}`: soft delete file metadata.
 - `GET /api/v1/audit-logs`: paged persisted audit logs.
 - `GET /api/v1/audit-logs/{id}`: audit log detail.
-- `GET /api/v1/settings`: list system settings.
+- `GET /api/v1/settings`: list system settings, filterable by `group_key` and `keyword`.
 - `PUT /api/v1/settings/{key}`: create or update a setting.
+
+## Knowledge Base APIs
+
+- `GET|POST /api/v1/kb/categories`: list or create categories.
+- `DELETE /api/v1/kb/categories/{id}`: delete only when the category has no child categories, articles, or FAQs; otherwise returns `409 KB_CATEGORY_IN_USE`.
+- `GET|POST /api/v1/kb/articles`: paged article list and create. Lists support `keyword`, `category_id`, and `status`.
+- `GET|PUT|DELETE /api/v1/kb/articles/{id}`: article detail, update, and soft delete.
+- `GET|POST /api/v1/kb/faqs`: paged FAQ list and create. Lists support `keyword`, `category_id`, and `status`.
+
+## Collaboration APIs
+
+- `GET /api/v1/notifications`: paged notifications.
+- `POST /api/v1/notifications`: create a persisted notification.
+- `GET /api/v1/notifications/unread-count`: current unread count.
+- `PUT /api/v1/notifications/{id}/read`: mark one notification as read.
+- `PUT /api/v1/notifications/read-all`: mark visible notifications as read.
+- `GET /api/v1/notifications/ws`: WebSocket unread/change events using `token` query auth.
+- `GET|POST|PUT|DELETE /api/v1/message-templates`: message template management. Lists support `keyword`, `category`, and `status`.
+- `GET|POST|PUT|DELETE /api/v1/approval/templates`: approval template management. Lists support `keyword`, `biz_type`, and `status`.
+- `GET|POST /api/v1/approval/instances`: list and submit approval instances. Lists support `keyword`, `biz_type`, and `status`.
+- `POST /api/v1/approval/instances/{id}/action`: approve or reject an instance.
+- `GET|POST|PUT|DELETE /api/v1/workflows`: workflow definition management. Lists support `keyword`, `category`, and `status`.
+- `POST /api/v1/workflows/{id}/run`: create a workflow run instance.
+- `GET /api/v1/workflows/instances`: list workflow runs.
+- `GET /api/v1/ai-assistant/messages`: current user's stored AI chat messages.
+- `POST /api/v1/ai-assistant/chat`: forward a message to the configured AI provider and store the reply.
 
 ## Runtime Visibility Rule
 

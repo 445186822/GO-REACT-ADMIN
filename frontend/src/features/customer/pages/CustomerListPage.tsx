@@ -8,7 +8,7 @@ import {
   ProTable,
   type ActionType,
 } from '@ant-design/pro-components';
-import { Button, Modal, Space, Tag, Typography, message } from 'antd';
+import { App, Button, Space, Tag, Typography, message } from 'antd';
 import { useRef, useState } from 'react';
 import {
   createCustomer,
@@ -23,6 +23,7 @@ import { BackendDownloadButton } from '../../../components/BackendDownloadButton
 import { Permission } from '../../../components/Permission';
 
 export function CustomerListPage() {
+  const { modal } = App.useApp();
   const actionRef = useRef<ActionType>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<CustomerRow | null>(null);
@@ -81,7 +82,7 @@ export function CustomerListPage() {
   }
 
   function confirmDelete(row: CustomerRow) {
-    Modal.confirm({
+    modal.confirm({
       title: `删除客户 ${row.name}?`,
       content: '客户采用软删除，后续可扩展回收站和审计日志。',
       okText: '删除',

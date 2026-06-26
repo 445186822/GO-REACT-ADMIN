@@ -7,11 +7,12 @@ Enterprise Demo is being built as a production-style enterprise admin applicatio
 - Backend Echo server, configuration, structured logging, request ID, CORS, recovery, and unified responses.
 - PostgreSQL connection, migration runner, and required system metadata initialization.
 - Real JWT login, refresh token, and current-user API backed by `sys_users`.
-- Authenticated APIs for users, roles list, menus, departments, customers, files, audit logs, and settings.
+- Authenticated APIs for users, roles list, menus, departments, customers, files, audit logs, settings, notifications, message templates, approvals, workflows, and AI assistant messages.
+- WebSocket notification updates backed by persisted notification records.
 - Local file storage with persisted file metadata.
 - Non-GET API audit logging persisted to `sys_audit_logs`.
 - React + TypeScript + Vite + Ant Design admin shell.
-- Login, dashboard, users, roles, menus, departments, customers, files, audit logs, and settings pages wired to backend APIs.
+- Login, dashboard, users, roles, menus, departments, customers, collaboration modules, files, audit logs, and settings pages wired to backend APIs.
 - Docker Compose for PostgreSQL and Redis.
 
 ## No Mock Policy
@@ -90,4 +91,11 @@ Login with the real `admin` account and the password configured by `INITIAL_ADMI
 
 ## Extension Rule
 
-Additional modules such as orders, tasks, approvals, WebSocket notifications, and AI chat may be added later. They must not be exposed in routes, menus, OpenAPI, or product documentation until they have real tables, APIs, frontend pages, permissions, and verification.
+Additional modules such as orders and tasks may be added later. They must not be exposed in routes, menus, OpenAPI, or product documentation until they have real tables, APIs, frontend pages, permissions, and verification.
+
+AI assistant chat requires a real backend integration endpoint:
+
+```bash
+AI_ASSISTANT_ENDPOINT=<https endpoint returning {"reply":"..."} >
+AI_ASSISTANT_API_KEY=<optional bearer token>
+```

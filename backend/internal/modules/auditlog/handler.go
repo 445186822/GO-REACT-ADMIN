@@ -22,7 +22,7 @@ func NewHandler(db *pgxpool.Pool, jwtSecret string) *Handler {
 }
 
 func (h *Handler) Register(g *echo.Group) {
-	group := g.Group("/audit-logs", middleware.Auth(h.jwtSecret))
+	group := g.Group("/audit-logs", middleware.Auth(h.jwtSecret), middleware.RequirePermission(h.db))
 	group.GET("", h.List)
 	group.GET("/:id", h.Get)
 }

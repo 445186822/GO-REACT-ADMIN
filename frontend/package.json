@@ -7,13 +7,14 @@
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "vitest run src",
     "test:e2e": "playwright test"
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",
     "@ant-design/pro-components": "^2.8.6",
     "@tanstack/react-query": "^5.83.0",
+    "@xyflow/react": "^12.11.1",
     "antd": "^5.26.7",
     "axios": "^1.11.0",
     "react": "^19.1.0",
@@ -23,6 +24,7 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/node": "^22.10.5",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

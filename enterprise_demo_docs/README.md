@@ -13,9 +13,10 @@ Enterprise Demo is a production-style admin template with:
 - Data-scope example through customer management.
 - React + Vite + Ant Design frontend.
 - File upload/download, audit logs, and settings.
+- Notifications, message templates, approvals, workflows, and AI assistant chat storage.
 - Frontend and backend XLSX download examples.
 
-Unfinished modules must not appear in runtime menus, frontend routes, backend routes, seed data, or OpenAPI. Planned-but-not-implemented features such as orders, tasks, approvals, realtime notifications, and AI chat are excluded from these docs until they are real.
+Unfinished modules must not appear in runtime menus, frontend routes, backend routes, seed data, or OpenAPI. Planned-but-not-implemented features such as orders and tasks are excluded from these docs until they are real.
 
 ## Documents
 

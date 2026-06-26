@@ -1,6 +1,6 @@
 ﻿import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { ModalForm, ProColumns, ProFormSelect, ProFormText, ProTable, type ActionType } from '@ant-design/pro-components';
-import { Button, Modal, Space, Tag, Typography, message } from 'antd';
+import { App, Button, Space, Tag, Typography, message } from 'antd';
 import { useRef, useState } from 'react';
 import { createUser, deleteUser, listUsers, updateUser, type UserForm, type UserRow } from '../../../api/users';
 import { Permission } from '../../../components/Permission';
@@ -8,6 +8,7 @@ import { ExportButton } from '../../../components/ExportButton';
 import { exportExcel } from '../../../utils/exportExcel';
 
 export function UserListPage() {
+  const { modal } = App.useApp();
   const actionRef = useRef<ActionType>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
@@ -55,7 +56,7 @@ export function UserListPage() {
   }
 
   function confirmDelete(row: UserRow) {
-    Modal.confirm({
+    modal.confirm({
       title: `删除用户 ${row.display_name}?`,
       content: '删除后该用户将无法登录，数据采用软删除保留审计痕迹。',
       okText: '删除',

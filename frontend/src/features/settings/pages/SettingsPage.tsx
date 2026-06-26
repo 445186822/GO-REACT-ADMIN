@@ -1,4 +1,4 @@
-﻿import { EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
   ModalForm,
   ProColumns,
@@ -9,25 +9,50 @@ import {
   ProTable,
   type ActionType,
 } from '@ant-design/pro-components';
-import { Button, Typography, message } from 'antd';
-import { useRef, useState } from 'react';
+import { Button, Space, Tabs, Tag, Typography, message } from 'antd';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { listSettings, upsertSetting, type SettingForm, type SettingRow } from '../../../api/settings';
-import { Permission } from '../../../components/Permission';
 import { ExportButton } from '../../../components/ExportButton';
+import { Permission } from '../../../components/Permission';
 import { exportExcel } from '../../../utils/exportExcel';
+import { groupSettingsForView, settingValuePreview } from '../settingsView';
+
+const { Text, Title } = Typography;
 
 export function SettingsPage() {
   const actionRef = useRef<ActionType>(null);
+  const [rows, setRows] = useState<SettingRow[]>([]);
+  const [activeGroup, setActiveGroup] = useState('system');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<SettingRow | null>(null);
+  const groups = useMemo(() => groupSettingsForView(rows), [rows]);
+  const active = groups.find((group) => group.key === activeGroup) ?? groups[0];
+
+  async function loadSettings() {
+    const data = await listSettings();
+    setRows(data);
+    if (!data.some((item) => item.group_key === activeGroup)) {
+      const firstGroup = groupSettingsForView(data)[0];
+      if (firstGroup) setActiveGroup(firstGroup.key);
+    }
+  }
+
+  useEffect(() => {
+    void loadSettings();
+  }, []);
 
   const columns: ProColumns<SettingRow>[] = [
-    { title: '分组', dataIndex: 'group_key' },
-    { title: '键', dataIndex: 'setting_key', copyable: true },
-    { title: '值', dataIndex: 'setting_value', search: false, ellipsis: true },
-    { title: '类型', dataIndex: 'value_type', search: false },
+    { title: '配置键', dataIndex: 'setting_key', copyable: true },
+    {
+      title: '配置值',
+      dataIndex: 'setting_value',
+      search: false,
+      ellipsis: true,
+      render: (_, row) => <Text className="settings-value" ellipsis>{settingValuePreview(row)}</Text>,
+    },
+    { title: '类型', dataIndex: 'value_type', width: 100, search: false, render: (_, row) => <Tag>{row.value_type}</Tag> },
     { title: '说明', dataIndex: 'description', search: false, ellipsis: true },
-    { title: '更新时间', dataIndex: 'updated_at', valueType: 'dateTime', search: false },
+    { title: '更新时间', dataIndex: 'updated_at', valueType: 'dateTime', width: 170, search: false },
     {
       title: '操作',
       valueType: 'option',
@@ -52,12 +77,13 @@ export function SettingsPage() {
     message.success('配置已保存');
     setOpen(false);
     setEditing(null);
+    await loadSettings();
     actionRef.current?.reload();
     return true;
   }
 
   async function exportSettings() {
-    const rows = await listSettings();
+    const data = await listSettings();
     await exportExcel<SettingRow>(
       'settings.xlsx',
       'Settings',
@@ -71,29 +97,22 @@ export function SettingsPage() {
         { title: '加密', dataIndex: 'is_encrypted' },
         { title: '更新时间', dataIndex: 'updated_at' },
       ],
-      rows,
+      data,
     );
     message.success('系统配置 Excel 已生成');
   }
 
   return (
-    <div>
-      <Typography.Title level={3}>系统配置</Typography.Title>
-      <ProTable<SettingRow>
-        actionRef={actionRef}
-        rowKey="id"
-        columns={columns}
-        search={{ labelWidth: 80 }}
-        request={async (params) => ({
-          data: await listSettings({ group_key: params.group_key as string | undefined }),
-          success: true,
-        })}
-        pagination={{ defaultPageSize: 10, showSizeChanger: false }}
-        toolBarRender={() => [
-          <ExportButton key="export" onClick={exportSettings}>
-            导出 Excel
-          </ExportButton>,
-          <Permission code="settings:update" key="create">
+    <div className="settings-workspace">
+      <div className="settings-header">
+        <div>
+          <Title level={3}>系统配置</Title>
+          <Text type="secondary">集中维护运行参数、安全策略、文件限制、通知和 AI 能力，不再暴露难以理解的空白配置表。</Text>
+        </div>
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={loadSettings}>刷新</Button>
+          <ExportButton onClick={exportSettings}>导出 Excel</ExportButton>
+          <Permission code="settings:update">
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -104,8 +123,47 @@ export function SettingsPage() {
             >
               新增配置
             </Button>
-          </Permission>,
-        ]}
+          </Permission>
+        </Space>
+      </div>
+
+      <Tabs
+        className="settings-group-tabs"
+        activeKey={active?.key}
+        onChange={setActiveGroup}
+        items={groups.map((group) => ({
+          key: group.key,
+          label: `${group.title} (${group.items.length})`,
+          children: (
+            <>
+              <div className="settings-group-summary">
+                <div>
+                  <Text strong>{group.title}</Text>
+                  <br />
+                  <Text type="secondary">{group.description}</Text>
+                </div>
+              </div>
+              <ProTable<SettingRow>
+                key={`${group.key}-${group.items.length}`}
+                actionRef={actionRef}
+                rowKey="id"
+                columns={columns}
+                request={async (params) => {
+                  const keyword = String(params.setting_key ?? '').trim().toLowerCase();
+                  const data = keyword
+                    ? group.items.filter((item) =>
+                        [item.setting_key, item.setting_value, item.description ?? ''].some((value) => value.toLowerCase().includes(keyword)),
+                      )
+                    : group.items;
+                  return { data, success: true };
+                }}
+                search={{ labelWidth: 80 }}
+                options={false}
+                pagination={{ defaultPageSize: 10, showSizeChanger: false }}
+              />
+            </>
+          ),
+        }))}
       />
 
       <ModalForm<SettingForm>
@@ -128,11 +186,22 @@ export function SettingsPage() {
                 description: editing.description ?? undefined,
                 is_encrypted: editing.is_encrypted,
               }
-            : { group_key: 'system', value_type: 'string', is_encrypted: false }
+            : { group_key: activeGroup || 'system', value_type: 'string', is_encrypted: false }
         }
         onFinish={submit}
       >
-        <ProFormText name="group_key" label="分组" rules={[{ required: true }]} />
+        <ProFormSelect
+          name="group_key"
+          label="分组"
+          rules={[{ required: true }]}
+          options={[
+            { label: '基础信息', value: 'system' },
+            { label: '安全策略', value: 'security' },
+            { label: '文件与存储', value: 'file' },
+            { label: '通知设置', value: 'notification' },
+            { label: 'AI 设置', value: 'ai' },
+          ]}
+        />
         <ProFormText name="setting_key" label="键" disabled={Boolean(editing)} rules={[{ required: true }]} />
         <ProFormTextArea name="setting_value" label="值" rules={[{ required: true }]} fieldProps={{ rows: 4 }} />
         <ProFormSelect
@@ -151,4 +220,3 @@ export function SettingsPage() {
     </div>
   );
 }
-

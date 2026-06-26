@@ -9,6 +9,7 @@ import (
 	"enterprise-demo/backend/internal/exportxlsx"
 	"enterprise-demo/backend/internal/http/middleware"
 	"enterprise-demo/backend/internal/http/response"
+	"enterprise-demo/backend/internal/modules/recyclebin"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
@@ -24,7 +25,7 @@ func NewHandler(db *pgxpool.Pool, jwtSecret string) *Handler {
 }
 
 func (h *Handler) Register(g *echo.Group) {
-	group := g.Group("/customers", middleware.Auth(h.jwtSecret))
+	group := g.Group("/customers", middleware.Auth(h.jwtSecret), middleware.RequirePermission(h.db))
 	group.GET("", h.List)
 	group.POST("", h.Create)
 	group.POST("/export", h.Export)
@@ -215,12 +216,22 @@ func (h *Handler) Delete(c echo.Context) error {
 	if err != nil {
 		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "invalid id")
 	}
+	userID := middleware.CurrentUserID(c)
+
+	// Fetch name for recycle bin log
+	var name string
+	h.db.QueryRow(c.Request().Context(), `SELECT name FROM biz_customers WHERE id = $1 AND deleted_at IS NULL`, id).Scan(&name)
+
 	tag, err := h.db.Exec(c.Request().Context(), `UPDATE biz_customers SET deleted_at = now(), updated_at = now() WHERE id = $1 AND deleted_at IS NULL`, id)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
 		return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "customer not found")
+	}
+
+	if name != "" {
+		_ = recyclebin.LogDeletion(c.Request().Context(), h.db, "biz_customers", id, name, userID)
 	}
 	return response.OK(c, map[string]bool{"deleted": true})
 }

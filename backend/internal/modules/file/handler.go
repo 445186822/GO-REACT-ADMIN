@@ -28,7 +28,7 @@ func NewHandler(db *pgxpool.Pool, jwtSecret string, uploadDir string) *Handler {
 }
 
 func (h *Handler) Register(g *echo.Group) {
-	group := g.Group("/files", middleware.Auth(h.jwtSecret))
+	group := g.Group("/files", middleware.Auth(h.jwtSecret), middleware.RequirePermission(h.db))
 	group.GET("", h.List)
 	group.POST("/upload", h.Upload)
 	group.GET("/:id/download", h.Download)

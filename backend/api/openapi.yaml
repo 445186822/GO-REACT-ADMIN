@@ -178,6 +178,15 @@ paths:
   /settings:
     get:
       summary: List system settings
+      parameters:
+        - name: group_key
+          in: query
+          schema:
+            type: string
+        - name: keyword
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Settings
@@ -193,6 +202,187 @@ paths:
       responses:
         "200":
           description: Setting ID
+  /kb/categories:
+    get:
+      summary: List knowledge categories
+      responses:
+        "200":
+          description: Categories
+    post:
+      summary: Create knowledge category
+      responses:
+        "201":
+          description: Created category ID
+  /kb/categories/{id}:
+    put:
+      summary: Update knowledge category
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      summary: Delete an unused knowledge category
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Deleted
+        "409":
+          description: Category has child categories, articles, or FAQs
+  /kb/articles:
+    get:
+      summary: List knowledge articles
+      parameters:
+        - $ref: "#/components/parameters/Keyword"
+        - name: category_id
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paged articles
+    post:
+      summary: Create knowledge article
+      responses:
+        "201":
+          description: Created article ID
+  /kb/articles/{id}:
+    get:
+      summary: Get knowledge article and increment views
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Article
+    put:
+      summary: Update knowledge article
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      summary: Soft delete knowledge article
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Deleted
+  /kb/faqs:
+    get:
+      summary: List knowledge FAQs
+      parameters:
+        - $ref: "#/components/parameters/Keyword"
+        - name: category_id
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paged FAQs
+    post:
+      summary: Create knowledge FAQ
+      responses:
+        "201":
+          description: Created FAQ ID
+  /message-templates:
+    get:
+      summary: List message templates with backend filtering
+      parameters:
+        - $ref: "#/components/parameters/Keyword"
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Message templates
+  /approval/templates:
+    get:
+      summary: List approval templates with backend filtering
+      parameters:
+        - $ref: "#/components/parameters/Keyword"
+        - name: biz_type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approval templates
+  /approval/instances:
+    get:
+      summary: List approval instances with backend filtering
+      parameters:
+        - $ref: "#/components/parameters/Keyword"
+        - name: biz_type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approval instances
+    post:
+      summary: Submit approval instance
+      responses:
+        "201":
+          description: Created approval instance ID
+  /approval/instances/{id}/action:
+    post:
+      summary: Approve or reject an approval instance
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated approval status
+  /workflows:
+    get:
+      summary: List workflows with backend filtering
+      parameters:
+        - $ref: "#/components/parameters/Keyword"
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Workflows
+  /ai-assistant/messages:
+    get:
+      summary: List current user's persisted AI assistant messages
+      responses:
+        "200":
+          description: AI assistant messages
+  /ai-assistant/chat:
+    post:
+      summary: Send one message to the configured AI assistant provider and persist the reply
+      responses:
+        "200":
+          description: AI assistant reply
 components:
   securitySchemes:
     bearerAuth:
@@ -207,6 +397,11 @@ components:
       schema:
         type: integer
         format: int64
+    Keyword:
+      name: keyword
+      in: query
+      schema:
+        type: string
   schemas:
     ApiResponse:
       type: object

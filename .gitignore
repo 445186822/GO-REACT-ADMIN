@@ -6,6 +6,8 @@ node_modules/
 dist/
 build/
 coverage/
+test-results/
+frontend/test-results/
 
 *.tsbuildinfo
 
@@ -14,6 +16,7 @@ frontend/vite.config.d.ts
 
 backend/uploads/
 uploads/
+logs/
 
 *.log
 .DS_Store
