@@ -8,6 +8,7 @@ build/
 coverage/
 test-results/
 frontend/test-results/
+.superpowers/
 
 *.tsbuildinfo
 
