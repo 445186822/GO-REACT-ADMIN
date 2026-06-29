@@ -63,6 +63,7 @@ export function DataDictPage() {
   const [itemsLoading, setItemsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'tree'>('table');
   const [treeData, setTreeData] = useState<TreeDataNode[]>([]);
+  const [treeReload, setTreeReload] = useState(0);
 
   // --- Dict Types ---
 
@@ -92,12 +93,12 @@ export function DataDictPage() {
           <Button type="link" size="small" onClick={() => selectType(row)}>
             字典项
           </Button>
-          <Permission code="settings:update">
+          <Permission code="datadict:update">
             <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openTypeEdit(row)}>
               编辑
             </Button>
           </Permission>
-          <Permission code="settings:update">
+          <Permission code="datadict:delete">
             <Button type="link" danger size="small" icon={<DeleteOutlined />} onClick={() => confirmDeleteType(row)}>
               删除
             </Button>
@@ -118,12 +119,17 @@ export function DataDictPage() {
       content: '删除后该类型下的所有字典项也会被删除。',
       okButtonProps: { danger: true },
       onOk: async () => {
-        await deleteDictType(row.id);
-        message.success('已删除');
-        typeActionRef.current?.reload();
-        if (selectedType?.id === row.id) {
-          setSelectedType(null);
-          setItems([]);
+        try {
+          await deleteDictType(row.id);
+          message.success('已删除');
+          typeActionRef.current?.reload();
+          setTreeReload((n) => n + 1);
+          if (selectedType?.id === row.id) {
+            setSelectedType(null);
+            setItems([]);
+          }
+        } catch {
+          message.error('删除字典类型失败，请稍后重试');
         }
       },
     });
@@ -141,6 +147,9 @@ export function DataDictPage() {
     try {
       const data = await listDictItems(typeId);
       setItems(data);
+    } catch {
+      message.error('加载字典项失败');
+      setItems([]);
     } finally {
       setItemsLoading(false);
     }
@@ -167,12 +176,12 @@ export function DataDictPage() {
       width: 140,
       render: (_, row) => (
         <Space>
-          <Permission code="settings:update">
+          <Permission code="datadict:update">
             <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openItemEdit(row)}>
               编辑
             </Button>
           </Permission>
-          <Permission code="settings:update">
+          <Permission code="datadict:delete">
             <Button type="link" danger size="small" icon={<DeleteOutlined />} onClick={() => confirmDeleteItem(row)}>
               删除
             </Button>
@@ -192,9 +201,13 @@ export function DataDictPage() {
       title: `确定删除字典项「${row.label}」吗？`,
       okButtonProps: { danger: true },
       onOk: async () => {
-        await deleteDictItem(row.id);
-        message.success('已删除');
-        if (selectedType) loadItems(selectedType.id);
+        try {
+          await deleteDictItem(row.id);
+          message.success('已删除');
+          if (selectedType) loadItems(selectedType.id);
+        } catch {
+          message.error('删除字典项失败，请稍后重试');
+        }
       },
     });
   }
@@ -203,8 +216,9 @@ export function DataDictPage() {
 
   useEffect(() => {
     if (viewMode === 'tree') {
-      treeDictTypes().then((types) => {
-        const nodes: TreeDataNode[] = types.map((t) => ({
+      treeDictTypes()
+        .then((types) => {
+          const nodes: TreeDataNode[] = types.map((t) => ({
           key: `type-${t.id}`,
           title: (
             <Space>
@@ -227,9 +241,12 @@ export function DataDictPage() {
           })),
         }));
         setTreeData(nodes);
-      });
+      })
+        .catch(() => {
+          message.error('加载字典树失败');
+        });
     }
-  }, [viewMode]);
+  }, [viewMode, treeReload]);
 
   return (
     <div style={{ padding: '0 0 24px' }}>
@@ -252,7 +269,7 @@ export function DataDictPage() {
               </Space>
             }
             extra={
-              <Permission code="settings:update">
+              <Permission code="datadict:create">
                 <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingType(null); setTypeOpen(true); }}>
                   新增类型
                 </Button>
@@ -264,12 +281,17 @@ export function DataDictPage() {
                 actionRef={typeActionRef}
                 columns={typeColumns}
                 request={async (params) => {
-                  const res = await listDictTypes({
-                    keyword: params.keyword,
-                    page: params.current,
-                    page_size: params.pageSize,
-                  });
-                  return { data: res.items, total: res.total, success: true };
+                  try {
+                    const res = await listDictTypes({
+                      keyword: typeof params.name === 'string' ? params.name : (params.code && typeof params.code === 'string' ? params.code : undefined),
+                      page: params.current,
+                      page_size: params.pageSize,
+                    });
+                    return { data: res.items, total: res.total, success: true };
+                  } catch {
+                    message.error('加载字典类型失败');
+                    return { data: [], total: 0, success: false };
+                  }
                 }}
                 rowKey="id"
                 search={{ labelWidth: 'auto' }}
@@ -305,7 +327,7 @@ export function DataDictPage() {
                 </Space>
               }
               extra={
-                <Permission code="settings:update">
+                <Permission code="datadict:create">
                   <Button
                     type="primary"
                     icon={<PlusOutlined />}
@@ -353,14 +375,20 @@ export function DataDictPage() {
             : { status: 'ENABLED', sort_order: 0 }
         }
         onFinish={async (values) => {
-          if (editingType) {
-            await updateDictType(editingType.id, values);
-          } else {
-            await createDictType(values);
+          try {
+            if (editingType) {
+              await updateDictType(editingType.id, values);
+            } else {
+              await createDictType(values);
+            }
+            message.success(editingType ? '已更新' : '已创建');
+            typeActionRef.current?.reload();
+            setTreeReload((n) => n + 1);
+            return true;
+          } catch {
+            message.error('保存字典类型失败，请稍后重试');
+            return false;
           }
-          message.success(editingType ? '已更新' : '已创建');
-          typeActionRef.current?.reload();
-          return true;
         }}
         modalProps={{ destroyOnClose: true }}
       >
@@ -389,14 +417,19 @@ export function DataDictPage() {
             : { status: 'ENABLED', sort_order: items.length + 1 }
         }
         onFinish={async (values) => {
-          if (editingItem) {
-            await updateDictItem(editingItem.id, values);
-          } else if (selectedType) {
-            await createDictItem(selectedType.id, values);
+          try {
+            if (editingItem) {
+              await updateDictItem(editingItem.id, values);
+            } else if (selectedType) {
+              await createDictItem(selectedType.id, values);
+            }
+            message.success(editingItem ? '已更新' : '已创建');
+            if (selectedType) loadItems(selectedType.id);
+            return true;
+          } catch {
+            message.error('保存字典项失败，请稍后重试');
+            return false;
           }
-          message.success(editingItem ? '已更新' : '已创建');
-          if (selectedType) loadItems(selectedType.id);
-          return true;
         }}
         modalProps={{ destroyOnClose: true }}
       >

@@ -1,5 +1,5 @@
 ﻿import { ProColumns, ProTable } from '@ant-design/pro-components';
-import { Tag, Typography, message } from 'antd';
+import { Tag, message } from 'antd';
 import { listMenus, type MenuRow } from '../../../api/menus';
 import { ExportButton } from '../../../components/ExportButton';
 import { exportExcel } from '../../../utils/exportExcel';
@@ -39,7 +39,6 @@ export function MenuListPage() {
 
   return (
     <div>
-      <Typography.Title level={3}>菜单权限</Typography.Title>
       <ProTable<MenuRow>
         rowKey="id"
         columns={columns}

@@ -8,6 +8,8 @@ export type UserRow = {
   phone?: string | null;
   status: 'ACTIVE' | 'DISABLED';
   department?: string | null;
+  role_id?: number | null;
+  role_name?: string | null;
 };
 
 export type Page<T> = {
@@ -29,7 +31,12 @@ export type UserForm = {
   email?: string;
   phone?: string;
   status?: 'ACTIVE' | 'DISABLED';
+  role_id?: number;
 };
+
+export async function resetUserPassword(id: number, password: string): Promise<void> {
+  await http.put(`/users/${id}/reset-password`, { password });
+}
 
 export async function createUser(payload: UserForm): Promise<{ id: number }> {
   const res = await http.post<unknown, { data: { id: number } }>('/users', payload);

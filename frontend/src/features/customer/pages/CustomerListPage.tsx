@@ -8,7 +8,7 @@ import {
   ProTable,
   type ActionType,
 } from '@ant-design/pro-components';
-import { App, Button, Space, Tag, Typography, message } from 'antd';
+import { App, Button, Space, Tag, Tooltip, message } from 'antd';
 import { useRef, useState } from 'react';
 import {
   createCustomer,
@@ -27,6 +27,7 @@ export function CustomerListPage() {
   const actionRef = useRef<ActionType>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<CustomerRow | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
   const columns: ProColumns<CustomerRow>[] = [
     { title: '客户名称', dataIndex: 'name', copyable: true },
@@ -116,8 +117,7 @@ export function CustomerListPage() {
   }
 
   return (
-    <div>
-      <Typography.Title level={3}>客户管理</Typography.Title>
+    <div style={{ padding: '0 0 24px' }}>
       <ProTable<CustomerRow>
         actionRef={actionRef}
         rowKey="id"
@@ -132,7 +132,39 @@ export function CustomerListPage() {
           return { data: data.items, total: data.total, success: true };
         }}
         pagination={{ defaultPageSize: 10, showSizeChanger: false }}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: (keys) => setSelectedRowKeys(keys),
+        }}
         toolBarRender={() => [
+          selectedRowKeys.length > 0 ? (
+            <Permission code="customer:delete" key="batch-delete">
+              <Tooltip title={`已选择 ${selectedRowKeys.length} 项`}>
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => {
+                    modal.confirm({
+                      title: `确定批量删除选中的 ${selectedRowKeys.length} 个客户吗？`,
+                      content: '客户采用软删除。',
+                      okText: '删除',
+                      okButtonProps: { danger: true },
+                      onOk: async () => {
+                        for (const id of selectedRowKeys) {
+                          await deleteCustomer(Number(id));
+                        }
+                        message.success(`已删除 ${selectedRowKeys.length} 个客户`);
+                        setSelectedRowKeys([]);
+                        actionRef.current?.reload();
+                      },
+                    });
+                  }}
+                >
+                  批量删除 ({selectedRowKeys.length})
+                </Button>
+              </Tooltip>
+            </Permission>
+          ) : null,
           <BackendDownloadButton key="export" onClick={handleExportCustomers}>
             导出 Excel
           </BackendDownloadButton>,
@@ -195,4 +227,3 @@ function levelText(level: CustomerRow['level']) {
   if (level === 'POTENTIAL') return '潜在客户';
   return '普通客户';
 }
-

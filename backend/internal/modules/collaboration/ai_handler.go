@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"enterprise-demo/backend/internal/http/middleware"
@@ -49,7 +50,13 @@ func (h *Handler) Chat(c echo.Context) error {
 		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "messages required")
 	}
 
-	authToken := "sk-13184616fc9444cca790b7e780c78706"
+	authToken := os.Getenv("AI_API_KEY")
+	if authToken == "" {
+		authToken = os.Getenv("AI_ASSISTANT_API_KEY")
+	}
+	if authToken == "" {
+		return response.NewError(http.StatusServiceUnavailable, "AI_NOT_CONFIGURED", "AI服务未配置API密钥")
+	}
 
 	systemMsg := ChatMessage{
 		Role:    "system",

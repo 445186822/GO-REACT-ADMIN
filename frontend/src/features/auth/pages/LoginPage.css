@@ -2,14 +2,221 @@
   min-height: 100vh;
   display: grid;
   place-items: center;
-  background: #f3f6fb;
+  padding: 32px 16px;
+  background:
+    linear-gradient(135deg, rgba(12, 127, 136, 0.18), transparent 34%),
+    linear-gradient(315deg, rgba(110, 84, 47, 0.12), transparent 38%),
+    linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%),
+    url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800"><defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="%23e8f0fe"/><stop offset="1" stop-color="%23d4e4fc"/></linearGradient><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%23f0f5ff"/><stop offset="1" stop-color="%23dbeafe"/></linearGradient></defs><rect fill="url(%23g1)" width="1200" height="800"/><circle cx="900" cy="150" r="300" fill="%23bfdbfe" opacity="0.5"/><circle cx="200" cy="600" r="250" fill="%23dbeafe" opacity="0.4"/><circle cx="1000" cy="650" r="200" fill="%23e0e7ff" opacity="0.5"/><path d="M0 500 Q200 350 400 480 T800 400 T1200 450 L1200 800 L0 800 Z" fill="%23eff6ff" opacity="0.7"/><path d="M0 600 Q300 500 600 580 T1200 520 L1200 800 L0 800 Z" fill="%23dbeafe" opacity="0.5"/></svg>');
+  background-size: cover;
+  background-position: center;
+}
+
+.login-shell {
+  width: min(900px, 100%);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+}
+
+.login-intro {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding: 42px;
+  color: #173b3f;
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.46), transparent 42%),
+    #dcefed;
+}
+
+.login-intro h1.ant-typography {
+  margin: 0;
+  color: #10383b;
+  font-size: 34px;
+  line-height: 1.12;
+}
+
+.login-intro .ant-typography {
+  margin: 0;
+  color: #315f61;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.login-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.login-metrics span {
+  padding: 6px 10px;
+  border: 1px solid rgba(16, 56, 59, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.62);
+  color: #1f4f52;
+  font-size: 13px;
 }
 
 .login-card {
-  width: 380px;
-  border-radius: 8px;
+  border: 0;
+  border-radius: 0;
+}
+
+.login-card .ant-card-body {
+  padding: 40px 36px;
+}
+
+.login-card h3.ant-typography {
+  margin-bottom: 4px;
 }
 
 .login-form {
-  margin-top: 24px;
+  margin-top: 22px;
+}
+
+.slider-captcha {
+  margin-bottom: 12px;
+  padding: 8px;
+  border: 1px solid #d7e2df;
+  border-radius: 8px;
+  background: #fbfdfc;
+  user-select: none;
+  touch-action: none;
+}
+
+.slider-captcha-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.slider-captcha-stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid #d7e2df;
+  border-radius: 6px;
+  background: #edf5f0;
+}
+
+.slider-captcha-bg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.slider-captcha-piece {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  pointer-events: none;
+  transition: left 0.08s linear;
+}
+
+.slider-captcha-track {
+  position: relative;
+  width: 100%;
+  height: 38px;
+  margin-top: 6px;
+  overflow: hidden;
+  border: 1px solid #d7e2df;
+  border-radius: 6px;
+  background: #f4f8f7;
+}
+
+.slider-captcha-progress {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(12, 127, 136, 0.14);
+  transition: width 0.08s linear;
+}
+
+.slider-captcha-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 44px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-right: 1px solid rgba(12, 127, 136, 0.26);
+  border-radius: 5px;
+  background: #1296db;
+  color: #fff;
+  cursor: grab;
+  transition: transform 0.08s linear, background 0.16s ease;
+  z-index: 1;
+}
+
+.slider-captcha-handle:active {
+  cursor: grabbing;
+}
+
+.slider-captcha-handle:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.slider-captcha-track-text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #7a8785;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.slider-captcha-disabled {
+  background: #fafafa;
+}
+
+.slider-captcha-verified {
+  border-color: #46a36c;
+  background: #f3fbf6;
+}
+
+.slider-captcha-verified .slider-captcha-handle {
+  background: #46a36c;
+}
+
+.slider-captcha-status {
+  min-height: 0;
+  margin-top: 6px;
+  color: #64706f;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.slider-captcha-verified .slider-captcha-status {
+  color: #2f7a4b;
+}
+
+@media (max-width: 760px) {
+  .login-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .login-intro {
+    padding: 28px;
+  }
+
+  .login-intro h1.ant-typography {
+    font-size: 30px;
+  }
+
+  .login-card .ant-card-body {
+    padding: 28px;
+  }
 }

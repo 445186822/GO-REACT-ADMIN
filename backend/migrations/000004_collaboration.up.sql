@@ -25,22 +25,9 @@ CREATE TABLE msg_templates (
     deleted_at TIMESTAMPTZ NULL
 );
 
-CREATE TABLE approval_templates (
-    id BIGSERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
-    biz_type TEXT NOT NULL,
-    description TEXT NULL,
-    steps JSONB NOT NULL DEFAULT '[]'::jsonb,
-    status TEXT NOT NULL DEFAULT 'DRAFT',
-    created_by BIGINT NULL REFERENCES sys_users(id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    deleted_at TIMESTAMPTZ NULL
-);
-
 CREATE TABLE approval_instances (
     id BIGSERIAL PRIMARY KEY,
-    template_id BIGINT NULL REFERENCES approval_templates(id),
+    workflow_definition_id BIGINT NOT NULL,
     title TEXT NOT NULL,
     biz_type TEXT NOT NULL,
     biz_id TEXT NULL,
@@ -75,6 +62,10 @@ CREATE TABLE workflow_definitions (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     deleted_at TIMESTAMPTZ NULL
 );
+
+ALTER TABLE approval_instances
+ADD CONSTRAINT approval_instances_workflow_definition_id_fkey
+FOREIGN KEY (workflow_definition_id) REFERENCES workflow_definitions(id);
 
 CREATE TABLE workflow_instances (
     id BIGSERIAL PRIMARY KEY,

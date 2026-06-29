@@ -1,0 +1,1 @@
+-- Approval templates were physically removed. No rollback compatibility table is created.

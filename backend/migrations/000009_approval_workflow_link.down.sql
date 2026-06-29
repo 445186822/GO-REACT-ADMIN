@@ -1,4 +1,1 @@
-DROP INDEX IF EXISTS idx_approval_templates_workflow;
-
-ALTER TABLE approval_templates
-DROP COLUMN IF EXISTS workflow_definition_id;
+-- Approval instances are linked directly to workflow_definitions.

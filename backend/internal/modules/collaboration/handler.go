@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,6 +34,7 @@ func NewHandler(db *pgxpool.Pool, jwtSecret string) *Handler {
 
 func (h *Handler) Register(g *echo.Group) {
 	authGroup := g.Group("", middleware.Auth(h.jwtSecret), middleware.RequirePermission(h.db))
+	authGroup.GET("/todos", h.ListTodos)
 	authGroup.GET("/notifications", h.ListNotifications)
 	authGroup.POST("/notifications", h.CreateNotification)
 	authGroup.GET("/notifications/unread-count", h.UnreadCount)
@@ -44,10 +46,6 @@ func (h *Handler) Register(g *echo.Group) {
 	authGroup.PUT("/message-templates/:id", h.UpdateMessageTemplate)
 	authGroup.DELETE("/message-templates/:id", h.DeleteMessageTemplate)
 
-	authGroup.GET("/approval/templates", h.ListApprovalTemplates)
-	authGroup.POST("/approval/templates", h.CreateApprovalTemplate)
-	authGroup.PUT("/approval/templates/:id", h.UpdateApprovalTemplate)
-	authGroup.DELETE("/approval/templates/:id", h.DeleteApprovalTemplate)
 	authGroup.GET("/approval/instances", h.ListApprovalInstances)
 	authGroup.POST("/approval/instances", h.SubmitApproval)
 	authGroup.GET("/approval/instances/:id", h.GetApprovalInstance)
@@ -86,6 +84,81 @@ type NotificationRequest struct {
 	RecipientID  *int64 `json:"recipient_id"`
 }
 
+type TodoRow struct {
+	ID              int64     `json:"id"`
+	SourceModule    string    `json:"source_module"`
+	SourceID        int64     `json:"source_id"`
+	Title           string    `json:"title"`
+	BizType         string    `json:"biz_type"`
+	BizID           *string   `json:"biz_id"`
+	Applicant       string    `json:"applicant"`
+	CurrentStep     int       `json:"current_step"`
+	CurrentStepName string    `json:"current_step_name"`
+	Assignee        string    `json:"assignee"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+func (h *Handler) ListTodos(c echo.Context) error {
+	userID := middleware.CurrentUserID(c)
+	roles, err := h.currentUserRoleLabels(c.Request().Context(), userID)
+	if err != nil {
+		return err
+	}
+	rows, err := h.db.Query(c.Request().Context(), `
+SELECT ai.id, ai.title, ai.biz_type, ai.biz_id, u.display_name, ai.current_step, ai.created_at,
+       wd.definition
+FROM approval_instances ai
+JOIN sys_users u ON u.id = ai.applicant_id
+JOIN workflow_definitions wd ON wd.id = ai.workflow_definition_id AND wd.deleted_at IS NULL AND wd.status = 'ACTIVE'
+WHERE ai.deleted_at IS NULL AND ai.status = 'PENDING'
+ORDER BY ai.created_at DESC`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	items := make([]TodoRow, 0)
+	for rows.Next() {
+		var (
+			id          int64
+			title       string
+			bizType     string
+			bizID       *string
+			applicant   string
+			currentStep int
+			createdAt   time.Time
+			definition  json.RawMessage
+		)
+		if err := rows.Scan(&id, &title, &bizType, &bizID, &applicant, &currentStep, &createdAt, &definition); err != nil {
+			return err
+		}
+		runtimeSteps := approvalRuntimeSteps(definition)
+		if currentStep >= len(runtimeSteps) {
+			continue
+		}
+		step := runtimeSteps[currentStep]
+		if !assigneeMatchesRoles(step.Assignee, roles) {
+			continue
+		}
+		items = append(items, TodoRow{
+			ID:              id,
+			SourceModule:    "approval",
+			SourceID:        id,
+			Title:           title,
+			BizType:         bizType,
+			BizID:           bizID,
+			Applicant:       applicant,
+			CurrentStep:     currentStep,
+			CurrentStepName: step.Name,
+			Assignee:        step.Assignee,
+			CreatedAt:       createdAt,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	return response.OK(c, items)
+}
+
 func (h *Handler) ListNotifications(c echo.Context) error {
 	userID := middleware.CurrentUserID(c)
 	page, pageSize := pagination(c)
@@ -114,6 +187,9 @@ ORDER BY created_at DESC LIMIT $3 OFFSET $4`, onlyMine, userID, pageSize, offset
 			return err
 		}
 		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 	return response.OK(c, response.Page[NotificationRow]{Items: items, Page: page, PageSize: pageSize, Total: total})
 }
@@ -211,6 +287,9 @@ ORDER BY updated_at DESC`, keyword, category, status)
 		}
 		items = append(items, item)
 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
 	return response.OK(c, items)
 }
 
@@ -261,97 +340,29 @@ func (h *Handler) DeleteMessageTemplate(c echo.Context) error {
 	return softDelete(c, h.db, "msg_templates")
 }
 
-type ApprovalTemplateRow struct {
-	ID                   int64           `json:"id"`
-	Name                 string          `json:"name"`
-	BizType              string          `json:"biz_type"`
-	Description          *string         `json:"description"`
-	Steps                json.RawMessage `json:"steps"`
-	WorkflowDefinitionID *int64          `json:"workflow_definition_id"`
-	Status               string          `json:"status"`
-	UpdatedAt            time.Time       `json:"updated_at"`
-}
-
-func (h *Handler) ListApprovalTemplates(c echo.Context) error {
-	keyword := c.QueryParam("keyword")
-	bizType := c.QueryParam("biz_type")
-	status := c.QueryParam("status")
-	rows, err := h.db.Query(c.Request().Context(), `
-SELECT id, name, biz_type, description, steps, workflow_definition_id, status, updated_at
-FROM approval_templates
-WHERE deleted_at IS NULL
-  AND ($1 = '' OR name ILIKE '%' || $1 || '%' OR COALESCE(description, '') ILIKE '%' || $1 || '%')
-  AND ($2 = '' OR biz_type = $2)
-  AND ($3 = '' OR status = $3)
-ORDER BY updated_at DESC`, keyword, bizType, status)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	items := make([]ApprovalTemplateRow, 0)
-	for rows.Next() {
-		var item ApprovalTemplateRow
-		if err := rows.Scan(&item.ID, &item.Name, &item.BizType, &item.Description, &item.Steps, &item.WorkflowDefinitionID, &item.Status, &item.UpdatedAt); err != nil {
-			return err
-		}
-		items = append(items, item)
-	}
-	return response.OK(c, items)
-}
-
-func (h *Handler) CreateApprovalTemplate(c echo.Context) error {
-	var req ApprovalTemplateRow
-	if err := c.Bind(&req); err != nil {
-		return err
-	}
-	if req.Name == "" || req.BizType == "" {
-		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "name and biz_type are required")
-	}
-	if req.Status == "" {
-		req.Status = "DRAFT"
-	}
-	var id int64
-	if err := h.db.QueryRow(c.Request().Context(), `
-INSERT INTO approval_templates (name, biz_type, description, steps, workflow_definition_id, status, created_by)
-VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7) RETURNING id`,
-		req.Name, req.BizType, req.Description, defaultJSON(req.Steps, "[]"), req.WorkflowDefinitionID, req.Status, middleware.CurrentUserID(c)).Scan(&id); err != nil {
-		return err
-	}
-	return response.Created(c, map[string]int64{"id": id})
-}
-
-func (h *Handler) UpdateApprovalTemplate(c echo.Context) error {
-	id, err := parseID(c)
-	if err != nil {
-		return err
-	}
-	var req ApprovalTemplateRow
-	if err := c.Bind(&req); err != nil {
-		return err
-	}
-	if _, err := h.db.Exec(c.Request().Context(), `
-UPDATE approval_templates SET name=$2, biz_type=$3, description=$4, steps=$5::jsonb, workflow_definition_id=$6, status=$7, updated_at=now()
-WHERE id=$1 AND deleted_at IS NULL`, id, req.Name, req.BizType, req.Description, defaultJSON(req.Steps, "[]"), req.WorkflowDefinitionID, req.Status); err != nil {
-		return err
-	}
-	return response.OK(c, map[string]bool{"updated": true})
-}
-
-func (h *Handler) DeleteApprovalTemplate(c echo.Context) error {
-	return softDelete(c, h.db, "approval_templates")
-}
-
 type ApprovalInstanceRow struct {
-	ID          int64           `json:"id"`
-	TemplateID  *int64          `json:"template_id"`
-	Title       string          `json:"title"`
-	BizType     string          `json:"biz_type"`
-	BizID       *string         `json:"biz_id"`
-	Applicant   string          `json:"applicant"`
-	Status      string          `json:"status"`
-	CurrentStep int             `json:"current_step"`
-	FormData    json.RawMessage `json:"form_data"`
-	CreatedAt   time.Time       `json:"created_at"`
+	ID          int64               `json:"id"`
+	WorkflowID  int64               `json:"workflow_definition_id"`
+	Workflow    string              `json:"workflow"`
+	Title       string              `json:"title"`
+	BizType     string              `json:"biz_type"`
+	BizID       *string             `json:"biz_id"`
+	Applicant   string              `json:"applicant"`
+	Status      string              `json:"status"`
+	CurrentStep int                 `json:"current_step"`
+	FormData    json.RawMessage     `json:"form_data"`
+	CreatedAt   time.Time           `json:"created_at"`
+	Actions     []ApprovalActionRow `json:"actions,omitempty"`
+	applicantID int64
+}
+
+type ApprovalActionRow struct {
+	ID        int64     `json:"id"`
+	StepIndex int       `json:"step_index"`
+	Approver  string    `json:"approver"`
+	Action    string    `json:"action"`
+	Comment   *string   `json:"comment"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 func (h *Handler) ListApprovalInstances(c echo.Context) error {
@@ -359,8 +370,10 @@ func (h *Handler) ListApprovalInstances(c echo.Context) error {
 	bizType := c.QueryParam("biz_type")
 	status := c.QueryParam("status")
 	rows, err := h.db.Query(c.Request().Context(), `
-SELECT ai.id, ai.template_id, ai.title, ai.biz_type, ai.biz_id, u.display_name, ai.status, ai.current_step, ai.form_data, ai.created_at
-FROM approval_instances ai JOIN sys_users u ON u.id = ai.applicant_id
+SELECT ai.id, ai.workflow_definition_id, wd.name, ai.title, ai.biz_type, ai.biz_id, u.display_name, ai.status, ai.current_step, ai.form_data, ai.created_at
+FROM approval_instances ai
+JOIN workflow_definitions wd ON wd.id = ai.workflow_definition_id
+JOIN sys_users u ON u.id = ai.applicant_id
 WHERE ai.deleted_at IS NULL
   AND ($1 = '' OR ai.title ILIKE '%' || $1 || '%' OR COALESCE(ai.biz_id, '') ILIKE '%' || $1 || '%' OR u.display_name ILIKE '%' || $1 || '%')
   AND ($2 = '' OR ai.biz_type = $2)
@@ -373,10 +386,13 @@ ORDER BY ai.created_at DESC`, keyword, bizType, status)
 	items := make([]ApprovalInstanceRow, 0)
 	for rows.Next() {
 		var item ApprovalInstanceRow
-		if err := rows.Scan(&item.ID, &item.TemplateID, &item.Title, &item.BizType, &item.BizID, &item.Applicant, &item.Status, &item.CurrentStep, &item.FormData, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.WorkflowID, &item.Workflow, &item.Title, &item.BizType, &item.BizID, &item.Applicant, &item.Status, &item.CurrentStep, &item.FormData, &item.CreatedAt); err != nil {
 			return err
 		}
 		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 	return response.OK(c, items)
 }
@@ -389,28 +405,32 @@ func (h *Handler) SubmitApproval(c echo.Context) error {
 	if req.Title == "" {
 		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "title is required")
 	}
+	if req.WorkflowID == 0 {
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "workflow_definition_id is required")
+	}
 	tx, err := h.db.Begin(c.Request().Context())
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback(c.Request().Context()) }()
-	template, err := resolveApprovalTemplate(c.Request().Context(), tx, req.TemplateID, req.BizType)
+	workflow, err := resolveApprovalWorkflow(c.Request().Context(), tx, req.WorkflowID)
 	if err != nil {
 		return err
 	}
-	req.TemplateID = &template.ID
-	req.BizType = template.BizType
+	if req.BizType == "" {
+		req.BizType = workflow.Category
+	}
 	var id int64
 	if err := tx.QueryRow(c.Request().Context(), `
-INSERT INTO approval_instances (template_id, title, biz_type, biz_id, applicant_id, form_data)
+INSERT INTO approval_instances (workflow_definition_id, title, biz_type, biz_id, applicant_id, form_data)
 VALUES ($1, $2, $3, $4, $5, $6::jsonb) RETURNING id`,
-		req.TemplateID, req.Title, req.BizType, req.BizID, middleware.CurrentUserID(c), defaultJSON(req.FormData, "{}")).Scan(&id); err != nil {
+		req.WorkflowID, req.Title, req.BizType, req.BizID, middleware.CurrentUserID(c), defaultJSON(req.FormData, "{}")).Scan(&id); err != nil {
 		return err
 	}
 	if err := tx.Commit(c.Request().Context()); err != nil {
 		return err
 	}
-	_, _ = h.insertNotification(c.Request().Context(), NotificationRequest{Title: "New approval submitted", Content: req.Title, NotifType: "approval", SourceModule: "approval"}, middleware.CurrentUserID(c))
+	_ = h.notifyCurrentApprovalStep(c.Request().Context(), id, middleware.CurrentUserID(c))
 	h.hub.BroadcastAll(map[string]string{"event": "approval_submitted"})
 	return response.Created(c, map[string]int64{"id": id})
 }
@@ -421,16 +441,23 @@ func (h *Handler) GetApprovalInstance(c echo.Context) error {
 		return err
 	}
 	row := h.db.QueryRow(c.Request().Context(), `
-SELECT ai.id, ai.template_id, ai.title, ai.biz_type, ai.biz_id, u.display_name, ai.status, ai.current_step, ai.form_data, ai.created_at
-FROM approval_instances ai JOIN sys_users u ON u.id = ai.applicant_id
+SELECT ai.id, ai.workflow_definition_id, wd.name, ai.title, ai.biz_type, ai.biz_id, ai.applicant_id, u.display_name, ai.status, ai.current_step, ai.form_data, ai.created_at
+FROM approval_instances ai
+JOIN workflow_definitions wd ON wd.id = ai.workflow_definition_id
+JOIN sys_users u ON u.id = ai.applicant_id
 WHERE ai.id=$1 AND ai.deleted_at IS NULL`, id)
 	var item ApprovalInstanceRow
-	if err := row.Scan(&item.ID, &item.TemplateID, &item.Title, &item.BizType, &item.BizID, &item.Applicant, &item.Status, &item.CurrentStep, &item.FormData, &item.CreatedAt); err != nil {
+	if err := row.Scan(&item.ID, &item.WorkflowID, &item.Workflow, &item.Title, &item.BizType, &item.BizID, &item.applicantID, &item.Applicant, &item.Status, &item.CurrentStep, &item.FormData, &item.CreatedAt); err != nil {
 		if err == pgx.ErrNoRows {
 			return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "approval instance not found")
 		}
 		return err
 	}
+	actions, err := h.listApprovalActions(c.Request().Context(), id)
+	if err != nil {
+		return err
+	}
+	item.Actions = actions
 	return response.OK(c, item)
 }
 
@@ -456,23 +483,35 @@ func (h *Handler) ActionApproval(c echo.Context) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback(c.Request().Context()) }()
-	var templateID *int64
+	var workflowID int64
 	var currentStep int
 	var title string
 	var currentStatus string
-	if err := tx.QueryRow(c.Request().Context(), `SELECT template_id, current_step, title, status FROM approval_instances WHERE id=$1 AND deleted_at IS NULL`, id).Scan(&templateID, &currentStep, &title, &currentStatus); err != nil {
+	var applicantID int64
+	if err := tx.QueryRow(c.Request().Context(), `SELECT workflow_definition_id, current_step, title, status, applicant_id FROM approval_instances WHERE id=$1 AND deleted_at IS NULL`, id).Scan(&workflowID, &currentStep, &title, &currentStatus, &applicantID); err != nil {
 		return err
 	}
 	if currentStatus != "PENDING" {
 		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "approval is not pending")
 	}
-	nextStatus := "REJECTED"
-	nextStep := currentStep
-	if req.Action == "APPROVE" {
-		stepsLen, err := approvalStepCount(c.Request().Context(), tx, templateID)
+	runtimeSteps, workflowDefinition, hasNotificationNode, err := loadApprovalRuntime(c.Request().Context(), tx, workflowID)
+	if err != nil {
+		return err
+	}
+	if currentStep < len(runtimeSteps) {
+		step := runtimeSteps[currentStep]
+		roles, err := h.currentUserRoleLabels(c.Request().Context(), middleware.CurrentUserID(c))
 		if err != nil {
 			return err
 		}
+		if !assigneeMatchesRoles(step.Assignee, roles) {
+			return response.NewError(http.StatusForbidden, "APPROVAL_ASSIGNEE_MISMATCH", "current approval step requires role: "+step.Assignee)
+		}
+	}
+	nextStatus := "REJECTED"
+	nextStep := currentStep
+	if req.Action == "APPROVE" {
+		stepsLen := len(runtimeSteps)
 		if stepsLen == 0 || currentStep+1 >= stepsLen {
 			nextStatus = "APPROVED"
 		} else {
@@ -489,76 +528,175 @@ func (h *Handler) ActionApproval(c echo.Context) error {
 	if err := tx.Commit(c.Request().Context()); err != nil {
 		return err
 	}
-	_, _ = h.insertNotification(c.Request().Context(), NotificationRequest{Title: "Approval updated", Content: title + " -> " + nextStatus, NotifType: "approval", SourceModule: "approval"}, middleware.CurrentUserID(c))
+	if nextStatus == "PENDING" && nextStep < len(runtimeSteps) {
+		_ = h.notifyAssigneeUsers(c.Request().Context(), runtimeSteps[nextStep].Assignee, "Approval pending", title, middleware.CurrentUserID(c))
+	} else if hasNotificationNode || workflowHasNotificationNode(workflowDefinition) {
+		_ = h.notifyUser(c.Request().Context(), applicantID, "Approval updated", title+" -> "+nextStatus, middleware.CurrentUserID(c))
+	}
 	h.hub.BroadcastAll(map[string]string{"event": "approval_updated"})
 	return response.OK(c, map[string]string{"status": nextStatus})
 }
 
-type approvalTemplateRuntime struct {
-	ID                   int64
-	BizType              string
-	WorkflowDefinitionID *int64
+type approvalWorkflowRuntime struct {
+	ID       int64
+	Category string
 }
 
-func resolveApprovalTemplate(ctx context.Context, tx pgx.Tx, templateID *int64, bizType string) (approvalTemplateRuntime, error) {
-	var item approvalTemplateRuntime
-	if templateID != nil {
-		err := tx.QueryRow(ctx, `
-SELECT id, biz_type, workflow_definition_id
-FROM approval_templates
-WHERE id=$1 AND deleted_at IS NULL AND status='ACTIVE'`, *templateID).Scan(&item.ID, &item.BizType, &item.WorkflowDefinitionID)
-		if err == pgx.ErrNoRows {
-			return item, response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "approval template is not available")
-		}
-		return item, err
-	}
-	if bizType == "" {
-		return item, response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "template_id or biz_type is required")
-	}
+func resolveApprovalWorkflow(ctx context.Context, tx pgx.Tx, workflowID int64) (approvalWorkflowRuntime, error) {
+	var item approvalWorkflowRuntime
 	err := tx.QueryRow(ctx, `
-SELECT id, biz_type, workflow_definition_id
-FROM approval_templates
-WHERE biz_type=$1 AND deleted_at IS NULL AND status='ACTIVE'
-ORDER BY updated_at DESC, id DESC LIMIT 1`, bizType).Scan(&item.ID, &item.BizType, &item.WorkflowDefinitionID)
+SELECT id, category
+FROM workflow_definitions
+WHERE id=$1 AND deleted_at IS NULL AND status='ACTIVE' AND category='approval'`, workflowID).Scan(&item.ID, &item.Category)
 	if err == pgx.ErrNoRows {
-		return item, response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "active approval template not found")
+		return item, response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "approval workflow is not available")
 	}
 	return item, err
 }
 
-func approvalStepCount(ctx context.Context, tx pgx.Tx, templateID *int64) (int, error) {
-	if templateID == nil {
-		return 0, nil
-	}
-	var steps json.RawMessage
-	var workflowDefinitionID *int64
-	if err := tx.QueryRow(ctx, `
-SELECT steps, workflow_definition_id
-FROM approval_templates
-WHERE id=$1 AND deleted_at IS NULL`, *templateID).Scan(&steps, &workflowDefinitionID); err != nil {
-		if err == pgx.ErrNoRows {
-			return 0, nil
-		}
-		return 0, err
-	}
-	if workflowDefinitionID != nil {
-		var definition json.RawMessage
-		if err := tx.QueryRow(ctx, `
+type collaborationQueryer interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
+func loadApprovalRuntime(ctx context.Context, q collaborationQueryer, workflowID int64) ([]approvalRuntimeStep, json.RawMessage, bool, error) {
+	var definition json.RawMessage
+	if err := q.QueryRow(ctx, `
 SELECT definition
 FROM workflow_definitions
-WHERE id=$1 AND deleted_at IS NULL AND status='ACTIVE'`, *workflowDefinitionID).Scan(&definition); err != nil {
-			if err != pgx.ErrNoRows {
-				return 0, err
-			}
-		} else {
-			return len(approvalWorkflowNodes(definition)), nil
+WHERE id=$1 AND deleted_at IS NULL AND status='ACTIVE'`, workflowID).Scan(&definition); err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil, false, nil
+		}
+		return nil, nil, false, err
+	}
+	return approvalRuntimeSteps(definition), definition, workflowHasNotificationNode(definition), nil
+}
+
+func (h *Handler) listApprovalActions(ctx context.Context, instanceID int64) ([]ApprovalActionRow, error) {
+	rows, err := h.db.Query(ctx, `
+SELECT aa.id, aa.step_index, u.display_name, aa.action, aa.comment, aa.created_at
+FROM approval_actions aa
+JOIN sys_users u ON u.id = aa.approver_id
+WHERE aa.instance_id = $1
+ORDER BY aa.created_at, aa.id`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]ApprovalActionRow, 0)
+	for rows.Next() {
+		var item ApprovalActionRow
+		if err := rows.Scan(&item.ID, &item.StepIndex, &item.Approver, &item.Action, &item.Comment, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (h *Handler) currentUserRoleLabels(ctx context.Context, userID int64) ([]string, error) {
+	rows, err := h.db.Query(ctx, `
+SELECT r.code, r.name
+FROM sys_roles r
+JOIN sys_user_roles ur ON ur.role_id = r.id
+WHERE ur.user_id = $1 AND r.deleted_at IS NULL AND r.status = 'ACTIVE'`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	roles := make([]string, 0)
+	for rows.Next() {
+		var code, name string
+		if err := rows.Scan(&code, &name); err != nil {
+			return nil, err
+		}
+		roles = append(roles, code, name)
+	}
+	return roles, rows.Err()
+}
+
+func (h *Handler) notifyCurrentApprovalStep(ctx context.Context, instanceID int64, actorID int64) error {
+	var workflowID int64
+	var title string
+	var currentStep int
+	if err := h.db.QueryRow(ctx, `
+SELECT workflow_definition_id, title, current_step
+FROM approval_instances
+WHERE id = $1 AND deleted_at IS NULL`, instanceID).Scan(&workflowID, &title, &currentStep); err != nil {
+		return err
+	}
+	steps, _, _, err := loadApprovalRuntime(ctx, h.db, workflowID)
+	if err != nil {
+		return err
+	}
+	if currentStep >= len(steps) {
+		return nil
+	}
+	return h.notifyAssigneeUsers(ctx, steps[currentStep].Assignee, "Approval pending", title, actorID)
+}
+
+func (h *Handler) notifyAssigneeUsers(ctx context.Context, assignee string, title string, content string, actorID int64) error {
+	userIDs, err := h.userIDsForAssignee(ctx, assignee)
+	if err != nil {
+		return err
+	}
+	if len(userIDs) == 0 {
+		if strings.TrimSpace(assignee) != "" {
+			return nil
+		}
+		_, err := h.insertNotification(ctx, NotificationRequest{Title: title, Content: content, NotifType: "approval", SourceModule: "approval"}, actorID)
+		if err == nil {
+			h.broadcastUnread(ctx, nil)
+		}
+		return err
+	}
+	for _, userID := range userIDs {
+		if err := h.notifyUser(ctx, userID, title, content, actorID); err != nil {
+			return err
 		}
 	}
-	var parsed []any
-	if err := json.Unmarshal(steps, &parsed); err != nil {
-		return 0, nil
+	return nil
+}
+
+func (h *Handler) notifyUser(ctx context.Context, userID int64, title string, content string, actorID int64) error {
+	recipientID := userID
+	_, err := h.insertNotification(ctx, NotificationRequest{Title: title, Content: content, NotifType: "approval", SourceModule: "approval", RecipientID: &recipientID}, actorID)
+	if err == nil {
+		h.broadcastUnread(ctx, &recipientID)
 	}
-	return len(parsed), nil
+	return err
+}
+
+func (h *Handler) userIDsForAssignee(ctx context.Context, assignee string) ([]int64, error) {
+	labels := normalizeAssigneeLabels(assignee)
+	if len(labels) == 0 {
+		return nil, nil
+	}
+	rows, err := h.db.Query(ctx, `
+SELECT DISTINCT u.id
+FROM sys_users u
+JOIN sys_user_roles ur ON ur.user_id = u.id
+JOIN sys_roles r ON r.id = ur.role_id
+WHERE u.deleted_at IS NULL
+  AND u.status = 'ACTIVE'
+  AND r.deleted_at IS NULL
+  AND r.status = 'ACTIVE'
+  AND (lower(r.code) = ANY($1) OR lower(r.name) = ANY($1))
+ORDER BY u.id`, labels)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	userIDs := make([]int64, 0)
+	for rows.Next() {
+		var userID int64
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		userIDs = append(userIDs, userID)
+	}
+	return userIDs, rows.Err()
 }
 
 type WorkflowRow struct {
@@ -594,6 +732,9 @@ ORDER BY updated_at DESC`, keyword, category, status)
 			return err
 		}
 		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 	return response.OK(c, items)
 }
@@ -717,6 +858,9 @@ ORDER BY wi.started_at DESC`)
 		}
 		items = append(items, map[string]any{"id": id, "definition_id": definitionID, "definition_name": definitionName, "title": title, "status": status, "started_at": startedAt, "ended_at": endedAt})
 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
 	return response.OK(c, items)
 }
 
@@ -739,6 +883,9 @@ func (h *Handler) GetWorkflowInstance(c echo.Context) error {
 			return err
 		}
 		logs = append(logs, map[string]any{"node_key": nodeKey, "node_name": nodeName, "status": status, "message": message, "created_at": createdAt})
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 	return response.OK(c, map[string]any{"id": id, "logs": logs})
 }
@@ -772,6 +919,9 @@ LIMIT 50`, middleware.CurrentUserID(c))
 			return err
 		}
 		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 	return response.OK(c, items)
 }
@@ -842,7 +992,17 @@ func (h *Handler) NotificationWS(c echo.Context) error {
 	if err != nil {
 		return response.NewError(http.StatusUnauthorized, "AUTH_INVALID_TOKEN", "invalid token")
 	}
-	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		host := r.Host
+		if strings.Contains(origin, host) {
+			return true
+		}
+		return false
+	}}
 	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		return err
@@ -955,7 +1115,19 @@ func defaultJSON(raw json.RawMessage, fallback string) string {
 	return string(raw)
 }
 
+func safeTableName(name string) bool {
+	for _, ch := range name {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_') {
+			return false
+		}
+	}
+	return len(name) > 0
+}
+
 func softDelete(c echo.Context, db *pgxpool.Pool, table string) error {
+	if !safeTableName(table) {
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "invalid table name")
+	}
 	id, err := parseID(c)
 	if err != nil {
 		return err

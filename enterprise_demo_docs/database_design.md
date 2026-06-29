@@ -15,8 +15,8 @@ The application uses PostgreSQL. Migrations live in `backend/migrations/` and ar
 - `sys_files`: uploaded file metadata and storage path.
 - `sys_notifications`: persisted notifications with read state and optional recipient.
 - `msg_templates`: reusable message templates with JSON variables.
-- `approval_templates`, `approval_instances`, `approval_actions`: approval definitions, submitted approvals, and action history.
-- `workflow_definitions`, `workflow_instances`, `workflow_logs`: workflow metadata, run records, and execution logs.
+- `approval_instances`, `approval_actions`: submitted workflow-backed approvals and action history.
+- `workflow_definitions`, `workflow_instances`, `workflow_logs`: workflow definitions, run records, execution logs, and approval node definitions.
 - `ai_assistant_messages`: stored AI assistant user and assistant messages.
 
 All mutable business/system tables use soft deletion through `deleted_at` where applicable.

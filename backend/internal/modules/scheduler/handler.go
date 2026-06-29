@@ -91,6 +91,9 @@ func (h *Handler) ListTasks(c echo.Context) error {
 		}
 		items = append(items, item)
 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
 	return response.OK(c, response.Page[TaskRow]{Items: items, Page: page, PageSize: pageSize, Total: total})
 }
 
@@ -220,6 +223,9 @@ func (h *Handler) ListExecutions(c echo.Context) error {
 			item.FinishedAt = &finished
 		}
 		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 	return response.OK(c, response.Page[ExecutionRow]{Items: items, Page: page, PageSize: pageSize, Total: total})
 }

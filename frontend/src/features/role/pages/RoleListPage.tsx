@@ -1,5 +1,5 @@
 ﻿import { ProColumns, ProTable } from '@ant-design/pro-components';
-import { Tag, Typography, message } from 'antd';
+import { Tag, message } from 'antd';
 import { listRoles, type RoleRow } from '../../../api/roles';
 import { ExportButton } from '../../../components/ExportButton';
 import { exportExcel } from '../../../utils/exportExcel';
@@ -35,7 +35,6 @@ export function RoleListPage() {
 
   return (
     <div>
-      <Typography.Title level={3}>角色管理</Typography.Title>
       <ProTable<RoleRow>
         rowKey="id"
         columns={columns}

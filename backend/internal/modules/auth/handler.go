@@ -1,6 +1,7 @@
 package authmodule
 
 import (
+	"context"
 	"net/http"
 	"sort"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"enterprise-demo/backend/internal/http/middleware"
 	"enterprise-demo/backend/internal/http/response"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -24,14 +26,17 @@ func NewHandler(db *pgxpool.Pool, jwtSecret string) *Handler {
 }
 
 func (h *Handler) Register(g *echo.Group) {
+	g.GET("/auth/captcha", h.CaptchaChallenge)
+	g.POST("/auth/captcha/verify", h.VerifyCaptcha)
 	g.POST("/auth/login", h.Login)
 	g.POST("/auth/refresh", h.Refresh)
 	g.GET("/auth/me", h.Me, middleware.Auth(h.jwtSecret))
 }
 
 type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username     string `json:"username"`
+	Password     string `json:"password"`
+	CaptchaToken string `json:"captcha_token"`
 }
 
 type LoginResponse struct {
@@ -59,9 +64,86 @@ type MenuNode struct {
 	Children []MenuNode `json:"children,omitempty"`
 }
 
+const captchaTTL = 2 * time.Minute
+
+func (h *Handler) CaptchaChallenge(c echo.Context) error {
+	challenge, err := newSliderChallenge()
+	if err != nil {
+		return err
+	}
+
+	ctx := c.Request().Context()
+	_, _ = h.db.Exec(ctx, `DELETE FROM auth_captcha_challenges WHERE expires_at < now() - interval '1 hour'`)
+	if _, err := h.db.Exec(ctx, `
+INSERT INTO auth_captcha_challenges (id, expected_path, challenge_type, expected_x, target_y, image_seed, expires_at)
+VALUES ($1, $2, 'slider', $3, $4, $5, now() + ($6 * interval '1 second'))`,
+		challenge.ChallengeID,
+		[]string{},
+		challenge.TargetX,
+		challenge.TargetY,
+		challenge.ImageSeed,
+		int(captchaTTL.Seconds()),
+	); err != nil {
+		return err
+	}
+
+	challenge.ExpiresIn = int(captchaTTL.Seconds())
+	return response.OK(c, challenge.CaptchaChallengeResponse)
+}
+
+func (h *Handler) VerifyCaptcha(c echo.Context) error {
+	var req CaptchaVerifyRequest
+	if err := c.Bind(&req); err != nil {
+		return err
+	}
+	if req.ChallengeID == "" || len(req.Track) == 0 {
+		return response.NewError(http.StatusBadRequest, "AUTH_CAPTCHA_INVALID", "\u9a8c\u8bc1\u8bf7\u6c42\u4e0d\u5b8c\u6574")
+	}
+
+	ctx := c.Request().Context()
+	var expectedX int
+	var expiresAt time.Time
+	err := h.db.QueryRow(ctx, `
+SELECT expected_x, expires_at
+FROM auth_captcha_challenges
+WHERE id = $1 AND challenge_type = 'slider' AND verified_at IS NULL AND used_at IS NULL`, req.ChallengeID).Scan(&expectedX, &expiresAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return response.NewError(http.StatusBadRequest, "AUTH_CAPTCHA_INVALID", "\u9a8c\u8bc1\u5df2\u5931\u6548\uff0c\u8bf7\u91cd\u65b0\u83b7\u53d6")
+		}
+		return err
+	}
+	if time.Now().After(expiresAt) {
+		return response.NewError(http.StatusBadRequest, "AUTH_CAPTCHA_EXPIRED", "\u9a8c\u8bc1\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u8bd5")
+	}
+	if !verifySliderOffset(expectedX, req.X, sliderCaptchaTolerance) {
+		return response.NewError(http.StatusBadRequest, "AUTH_CAPTCHA_FAILED", "\u6ed1\u5757\u4f4d\u7f6e\u4e0d\u6b63\u786e")
+	}
+
+	token, err := randomHex(24)
+	if err != nil {
+		return err
+	}
+	tag, err := h.db.Exec(ctx, `
+UPDATE auth_captcha_challenges
+SET verified_token = $2, verified_at = now()
+WHERE id = $1 AND verified_at IS NULL AND used_at IS NULL AND expires_at > now()`, req.ChallengeID, token)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return response.NewError(http.StatusBadRequest, "AUTH_CAPTCHA_EXPIRED", "\u9a8c\u8bc1\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u8bd5")
+	}
+
+	return response.OK(c, map[string]string{"captcha_token": token})
+}
+
 func (h *Handler) Login(c echo.Context) error {
 	var req LoginRequest
 	if err := c.Bind(&req); err != nil {
+		return err
+	}
+	if err := h.consumeCaptchaToken(c.Request().Context(), req.CaptchaToken); err != nil {
 		return err
 	}
 
@@ -95,6 +177,27 @@ WHERE username = $1 AND deleted_at IS NULL AND status = 'ACTIVE'`, req.Username)
 	user.DisplayName = displayName
 
 	return response.OK(c, LoginResponse{AccessToken: accessToken, RefreshToken: refreshToken, User: user})
+}
+
+func (h *Handler) consumeCaptchaToken(ctx context.Context, token string) error {
+	if token == "" {
+		return response.NewError(http.StatusBadRequest, "AUTH_CAPTCHA_REQUIRED", "\u8bf7\u5148\u5b8c\u6210\u62d6\u52a8\u9a8c\u8bc1")
+	}
+
+	tag, err := h.db.Exec(ctx, `
+UPDATE auth_captcha_challenges
+SET used_at = now()
+WHERE verified_token = $1
+  AND verified_at IS NOT NULL
+  AND used_at IS NULL
+  AND expires_at > now()`, token)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return response.NewError(http.StatusBadRequest, "AUTH_CAPTCHA_INVALID", "\u62d6\u52a8\u9a8c\u8bc1\u5df2\u5931\u6548\uff0c\u8bf7\u91cd\u8bd5")
+	}
+	return nil
 }
 
 func (h *Handler) Refresh(c echo.Context) error {

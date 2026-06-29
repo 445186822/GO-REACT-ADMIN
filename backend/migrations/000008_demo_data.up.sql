@@ -53,7 +53,7 @@ INSERT INTO kb_faqs (question, answer, category_id, sort_order, view_count, like
 -- 3. Workflow Definitions
 INSERT INTO workflow_definitions (name, category, description, definition, status, created_by, created_at, updated_at) VALUES
 ('请假审批流程', 'approval', '员工请假审批标准流程：提交→部门审批→HR确认→归档', '{"nodes":[{"key":"start","name":"提交请假申请","type":"start"},{"key":"dept_approval","name":"部门负责人审批","type":"approval","assignee":"部门负责人"},{"key":"hr_confirm","name":"HR确认","type":"approval","assignee":"HR经理"},{"key":"notify","name":"通知申请人","type":"notification"},{"key":"end","name":"归档","type":"end"}]}'::jsonb, 'ACTIVE', 1, now() - interval '30 days', now()),
-('客户入驻流程', 'general', '新客户入驻SOP：申请提交→资料审核→合规检查→创建账户→欢迎邮件→完成', '{"nodes":[{"key":"start","name":"客户提交申请","type":"start"},{"key":"review","name":"资料审核","type":"approval","assignee":"客户经理"},{"key":"check","name":"合规检查","type":"condition"},{"key":"create_account","name":"创建账户","type":"action"},{"key":"send_welcome","name":"欢迎邮件","type":"notification"},{"key":"end","name":"入驻完成","type":"end"}]}'::jsonb, 'ACTIVE', 1, now() - interval '15 days', now());
+('客户入驻流程', 'approval', '新客户入驻SOP：申请提交→资料审核→合规检查→创建账户→欢迎邮件→完成', '{"nodes":[{"key":"start","name":"客户提交申请","type":"start"},{"key":"review","name":"资料审核","type":"approval","assignee":"客户经理"},{"key":"check","name":"合规检查","type":"condition"},{"key":"create_account","name":"创建账户","type":"action"},{"key":"send_welcome","name":"欢迎邮件","type":"notification"},{"key":"end","name":"入驻完成","type":"end"}]}'::jsonb, 'ACTIVE', 1, now() - interval '15 days', now());
 
 -- Workflow Instances
 INSERT INTO workflow_instances (definition_id, title, status, input, started_by, started_at, ended_at)
@@ -66,36 +66,24 @@ UNION ALL
 SELECT id, 'ABC公司入驻流程', 'COMPLETED', '{"company":"ABC科技有限公司"}'::jsonb, 1, now() - interval '10 days', now() - interval '10 days' + interval '4 hours'
 FROM workflow_definitions WHERE name = '客户入驻流程';
 
--- 4. Approval Templates
-INSERT INTO approval_templates (name, biz_type, description, steps, status, created_by, created_at, updated_at) VALUES
-('请假审批模板', 'leave', '员工请假审批', '[{"name":"部门负责人审批","assignee":"部门负责人"},{"name":"HR审批","assignee":"HR经理"},{"name":"总经理审批","assignee":"总经理","condition":"days>3"}]'::jsonb, 'ACTIVE', 1, now() - interval '30 days', now()),
-('报销审批模板', 'reimbursement', '费用报销审批', '[{"name":"直接上级审批","assignee":"直接上级"},{"name":"财务审核","assignee":"财务主管"}]'::jsonb, 'ACTIVE', 1, now() - interval '20 days', now()),
-('采购审批模板', 'purchase', '采购申请审批', '[{"name":"部门审批","assignee":"部门负责人"},{"name":"采购审核","assignee":"采购经理"},{"name":"财务审批","assignee":"财务总监"},{"name":"CEO审批","assignee":"CEO","condition":"amount>50000"}]'::jsonb, 'ACTIVE', 1, now() - interval '10 days', now());
-
--- 5. Approval Instances
-INSERT INTO approval_instances (template_id, title, biz_type, biz_id, applicant_id, status, current_step, form_data, created_at, updated_at)
+-- 4. Approval Instances
+INSERT INTO approval_instances (workflow_definition_id, title, biz_type, biz_id, applicant_id, status, current_step, form_data, created_at, updated_at)
 SELECT id, '张三的年假申请（5天）', 'leave', 'leave_001', 1, 'APPROVED', 2, '{"reason":"家庭旅游","days":5}'::jsonb, now() - interval '5 days', now() - interval '4 days'
-FROM approval_templates WHERE biz_type = 'leave'
+FROM workflow_definitions WHERE name = '请假审批流程'
 UNION ALL
 SELECT id, '王五的病假申请（3天）', 'leave', 'leave_003', 1, 'PENDING', 0, '{"reason":"感冒发烧","days":3}'::jsonb, now() - interval '1 day', now() - interval '1 day'
-FROM approval_templates WHERE biz_type = 'leave'
+FROM workflow_definitions WHERE name = '请假审批流程'
 UNION ALL
-SELECT id, '张三的差旅报销', 'reimbursement', 'exp_001', 1, 'PENDING', 0, '{"type":"差旅费","amount":3200}'::jsonb, now() - interval '2 days', now() - interval '2 days'
-FROM approval_templates WHERE biz_type = 'reimbursement'
-UNION ALL
-SELECT id, '李四的办公用品报销', 'reimbursement', 'exp_002', 1, 'REJECTED', 1, '{"type":"办公用品","amount":850}'::jsonb, now() - interval '10 days', now() - interval '9 days'
-FROM approval_templates WHERE biz_type = 'reimbursement'
-UNION ALL
-SELECT id, '市场部采购服务器', 'purchase', 'pur_001', 1, 'APPROVED', 3, '{"item":"服务器","amount":85000}'::jsonb, now() - interval '15 days', now() - interval '12 days'
-FROM approval_templates WHERE biz_type = 'purchase';
+SELECT id, 'ABC公司入驻申请', 'customer_onboarding', 'customer_001', 1, 'PENDING', 0, '{"company":"ABC科技有限公司"}'::jsonb, now() - interval '10 hours', now() - interval '10 hours'
+FROM workflow_definitions WHERE name = '客户入驻流程';
 
--- 6. Recycle Bin
+-- 5. Recycle Bin
 INSERT INTO sys_recycled (source_table, source_id, summary, deleted_by, deleted_at) VALUES
 ('biz_customers', 999, '测试客户A（已删除示例）', 1, now() - interval '1 day'),
 ('biz_customers', 998, '测试客户B（已删除示例）', 1, now() - interval '3 days'),
 ('biz_customers', 997, '测试客户C（已删除示例）', 1, now() - interval '7 days');
 
--- 7. AI Chat History table
+-- 6. AI Chat History table
 CREATE TABLE IF NOT EXISTS ai_chat_history (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES sys_users(id),

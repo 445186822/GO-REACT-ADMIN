@@ -83,6 +83,9 @@ func (h *Handler) ListTypes(c echo.Context) error {
 		}
 		items = append(items, item)
 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
 	return response.OK(c, response.Page[DictTypeRow]{Items: items, Page: page, PageSize: pageSize, Total: total})
 }
 
@@ -151,6 +154,9 @@ func (h *Handler) TreeTypes(c echo.Context) error {
 				Remark: itemRemark, SortOrder: *itemSortOrder,
 			})
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 	return response.OK(c, types)
 }
@@ -258,6 +264,9 @@ func (h *Handler) ListItems(c echo.Context) error {
 			return err
 		}
 		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 	return response.OK(c, items)
 }

@@ -1,6 +1,6 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined, PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import { ModalForm, ProColumns, ProFormSelect, ProFormText, ProFormTextArea, ProTable, type ActionType } from '@ant-design/pro-components';
-import { Button, Popconfirm, Space, Tag, Typography, message } from 'antd';
+import { Button, Input, Popconfirm, Space, Tag, Typography, message } from 'antd';
 import { useRef, useState } from 'react';
 import {
   createMessageTemplate,
@@ -11,12 +11,22 @@ import {
 } from '../../../api/collaboration';
 import { Permission } from '../../../components/Permission';
 
-type TemplateForm = Omit<Partial<MessageTemplateRow>, 'variables'> & { variables_text?: string };
+type VariablePair = { key: string; value: string };
+
+interface TemplateFormValues {
+  code?: string;
+  name?: string;
+  category?: string;
+  subject?: string;
+  content?: string;
+  status?: string;
+}
 
 export function MessageTemplatePage() {
   const actionRef = useRef<ActionType>(null);
   const [editing, setEditing] = useState<MessageTemplateRow | null>(null);
   const [open, setOpen] = useState(false);
+  const [variables, setVariables] = useState<VariablePair[]>([{ key: '', value: '' }]);
 
   const columns: ProColumns<MessageTemplateRow>[] = [
     { title: '编码', dataIndex: 'code', copyable: true },
@@ -46,9 +56,13 @@ export function MessageTemplatePage() {
             <Popconfirm
               title="删除模板？"
               onConfirm={async () => {
-                await deleteMessageTemplate(row.id);
-                message.success('模板已删除');
-                actionRef.current?.reload();
+                try {
+                  await deleteMessageTemplate(row.id);
+                  message.success('模板已删除');
+                  actionRef.current?.reload();
+                } catch {
+                  message.error('删除模板失败，请稍后重试');
+                }
               }}
             >
               <Button type="link" size="small" danger icon={<DeleteOutlined />}>
@@ -63,52 +77,87 @@ export function MessageTemplatePage() {
 
   function openEdit(row: MessageTemplateRow) {
     setEditing(row);
+    const vars = Array.isArray(row.variables) ? row.variables : [];
+    const pairs: VariablePair[] = vars.map((v: unknown) => {
+      if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+        const obj = v as Record<string, string>;
+        const entries = Object.entries(obj);
+        if (entries.length > 0) {
+          return { key: entries[0][0], value: entries[0][1] ?? '' };
+        }
+      }
+      return { key: String(v), value: '' };
+    });
+    setVariables(pairs.length > 0 ? pairs : [{ key: '', value: '' }]);
     setOpen(true);
   }
 
-  async function submit(values: TemplateForm) {
-    const payload = { ...values, variables: parseJSON(values.variables_text || '[]') };
-    delete payload.variables_text;
-    if (editing) {
-      await updateMessageTemplate(editing.id, payload);
-    } else {
-      await createMessageTemplate(payload);
+  function addVariable() {
+    setVariables((prev) => [...prev, { key: '', value: '' }]);
+  }
+
+  function removeVariable(index: number) {
+    setVariables((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateVariable(index: number, field: 'key' | 'value', val: string) {
+    setVariables((prev) => prev.map((v, i) => (i === index ? { ...v, [field]: val } : v)));
+  }
+
+  function serializeVariables(): unknown[] {
+    return variables
+      .filter((v) => v.key.trim() !== '')
+      .map((v) => ({ [v.key.trim()]: v.value }));
+  }
+
+  async function submit(values: TemplateFormValues) {
+    try {
+      const payload = { ...values, variables: serializeVariables() };
+      if (editing) {
+        await updateMessageTemplate(editing.id, payload);
+      } else {
+        await createMessageTemplate(payload);
+      }
+      message.success('模板已保存');
+      setOpen(false);
+      setEditing(null);
+      actionRef.current?.reload();
+      return true;
+    } catch {
+      message.error('保存模板失败，请稍后重试');
+      return false;
     }
-    message.success('模板已保存');
-    setOpen(false);
-    setEditing(null);
-    actionRef.current?.reload();
-    return true;
   }
 
   return (
     <div>
-      <Typography.Title level={3}>消息模板</Typography.Title>
       <ProTable<MessageTemplateRow>
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
         request={async (params) => {
-          const data = await listMessageTemplates({
-            keyword: typeof params.name === 'string' ? params.name : typeof params.code === 'string' ? params.code : undefined,
-            category: typeof params.category === 'string' ? params.category : undefined,
-            status: typeof params.status === 'string' ? params.status : undefined,
-          });
-          return {
-            data,
-            success: true,
-          };
+          try {
+            const data = await listMessageTemplates({
+              keyword: typeof params.name === 'string' ? params.name : typeof params.code === 'string' ? params.code : undefined,
+              category: typeof params.category === 'string' ? params.category : undefined,
+              status: typeof params.status === 'string' ? params.status : undefined,
+            });
+            return { data, success: true };
+          } catch {
+            message.error('加载模板列表失败');
+            return { data: [], success: false };
+          }
         }}
         pagination={{ defaultPageSize: 10 }}
         toolBarRender={() => [
           <Permission code="message-template:create" key="create">
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setVariables([{ key: '', value: '' }]); setOpen(true); }}>
               新增模板
             </Button>
           </Permission>,
         ]}
       />
-      <ModalForm<TemplateForm>
+      <ModalForm<TemplateFormValues>
         title={editing ? '编辑模板' : '新增模板'}
         open={open}
         modalProps={{
@@ -120,8 +169,8 @@ export function MessageTemplatePage() {
         }}
         initialValues={
           editing
-            ? { ...editing, variables_text: JSON.stringify(editing.variables ?? [], null, 2) }
-            : { category: 'system_notice', status: 'ACTIVE', variables_text: '[]' }
+            ? { code: editing.code, name: editing.name, category: editing.category, subject: editing.subject, content: editing.content, status: editing.status }
+            : { category: 'system_notice', status: 'ACTIVE' }
         }
         onFinish={submit}
       >
@@ -139,17 +188,43 @@ export function MessageTemplatePage() {
         />
         <ProFormText name="subject" label="主题" rules={[{ required: true }]} />
         <ProFormTextArea name="content" label="内容" fieldProps={{ rows: 5 }} />
-        <ProFormTextArea name="variables_text" label="变量 JSON" fieldProps={{ rows: 4 }} />
+
+        {/* Key-Value Variable Editor */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Typography.Text strong>变量</Typography.Text>
+            <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={addVariable}>
+              添加变量
+            </Button>
+          </div>
+          {variables.map((v, index) => (
+            <div key={index} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+              <Input
+                placeholder="变量名"
+                value={v.key}
+                onChange={(e) => updateVariable(index, 'key', e.target.value)}
+                style={{ width: 150 }}
+              />
+              <Input
+                placeholder="变量值"
+                value={v.value}
+                onChange={(e) => updateVariable(index, 'value', e.target.value)}
+                style={{ flex: 1 }}
+              />
+              {variables.length > 1 && (
+                <Button
+                  type="link"
+                  danger
+                  icon={<MinusCircleOutlined />}
+                  onClick={() => removeVariable(index)}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+
         <ProFormSelect name="status" label="状态" options={[{ label: '启用', value: 'ACTIVE' }, { label: '停用', value: 'DISABLED' }]} />
       </ModalForm>
     </div>
   );
-}
-
-function parseJSON(value: string) {
-  try {
-    return JSON.parse(value);
-  } catch {
-    throw new Error('变量 JSON 格式不正确');
-  }
 }

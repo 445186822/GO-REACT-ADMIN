@@ -310,22 +310,6 @@ paths:
       responses:
         "200":
           description: Message templates
-  /approval/templates:
-    get:
-      summary: List approval templates with backend filtering
-      parameters:
-        - $ref: "#/components/parameters/Keyword"
-        - name: biz_type
-          in: query
-          schema:
-            type: string
-        - name: status
-          in: query
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Approval templates
   /approval/instances:
     get:
       summary: List approval instances with backend filtering

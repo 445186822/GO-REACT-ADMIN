@@ -71,8 +71,7 @@ Authenticated business APIs enforce backend permission codes derived from the re
 - `PUT /api/v1/notifications/read-all`: mark visible notifications as read.
 - `GET /api/v1/notifications/ws`: WebSocket unread/change events using `token` query auth.
 - `GET|POST|PUT|DELETE /api/v1/message-templates`: message template management. Lists support `keyword`, `category`, and `status`.
-- `GET|POST|PUT|DELETE /api/v1/approval/templates`: approval template management. Lists support `keyword`, `biz_type`, and `status`.
-- `GET|POST /api/v1/approval/instances`: list and submit approval instances. Lists support `keyword`, `biz_type`, and `status`.
+- `GET|POST /api/v1/approval/instances`: list and submit approval instances. Submitted instances bind directly to an approval workflow via `workflow_definition_id`; lists support `keyword`, `biz_type`, and `status`.
 - `POST /api/v1/approval/instances/{id}/action`: approve or reject an instance.
 - `GET|POST|PUT|DELETE /api/v1/workflows`: workflow definition management. Lists support `keyword`, `category`, and `status`.
 - `POST /api/v1/workflows/{id}/run`: create a workflow run instance.

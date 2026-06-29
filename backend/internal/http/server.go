@@ -11,6 +11,7 @@ import (
 	authmodule "enterprise-demo/backend/internal/modules/auth"
 	"enterprise-demo/backend/internal/modules/collaboration"
 	"enterprise-demo/backend/internal/modules/customer"
+	"enterprise-demo/backend/internal/modules/dashboard"
 	"enterprise-demo/backend/internal/modules/datadict"
 	"enterprise-demo/backend/internal/modules/knowledgebase"
 	"enterprise-demo/backend/internal/modules/monitor"
@@ -62,6 +63,7 @@ func NewServer(cfg config.Config, log *slog.Logger, db *pgxpool.Pool) *echo.Echo
 	collaboration.NewHandler(db, cfg.JWTSecret).Register(api)
 	datadict.NewHandler(db, cfg.JWTSecret).Register(api)
 	recyclebin.NewHandler(db, cfg.JWTSecret).Register(api)
+	dashboard.NewHandler(db, cfg.JWTSecret).Register(api)
 	monitor.NewHandler(db, cfg.JWTSecret).Register(api)
 	scheduler.NewHandler(db, cfg.JWTSecret).Register(api)
 	knowledgebase.NewHandler(db, cfg.JWTSecret).Register(api)

@@ -1,6 +1,6 @@
-import { CheckOutlined, PlusOutlined } from '@ant-design/icons';
+import { CheckOutlined, PlusOutlined, WifiOutlined } from '@ant-design/icons';
 import { ModalForm, ProColumns, ProFormSelect, ProFormText, ProFormTextArea, ProTable, type ActionType } from '@ant-design/pro-components';
-import { Badge, Button, Space, Typography, message } from 'antd';
+import { Badge, Button, Space, Tag, Tooltip, message } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import {
   createNotification,
@@ -10,32 +10,28 @@ import {
   unreadNotificationCount,
   type NotificationRow,
 } from '../../../api/collaboration';
-import { useAuthStore } from '../../../store/authStore';
+import { useNotificationWebSocket } from '../../../hooks/useNotificationWebSocket';
 
 export function NotificationCenterPage() {
   const actionRef = useRef<ActionType>(null);
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
-  const token = useAuthStore((state) => state.accessToken);
+
+  const { connected: wsConnected, onMessage } = useNotificationWebSocket();
 
   useEffect(() => {
     void refreshUnread();
   }, []);
 
   useEffect(() => {
-    if (!token) return;
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/notifications/ws?token=${encodeURIComponent(token)}`);
-    ws.onmessage = (event) => {
-      const payload = JSON.parse(event.data);
-      if (payload.event === 'unread_count') setUnread(payload.count ?? 0);
-      if (payload.event === 'notifications_changed') {
+    onMessage((data) => {
+      if (data.event === 'unread_count') setUnread(data.count ?? 0);
+      if (data.event === 'notifications_changed') {
         void refreshUnread();
         actionRef.current?.reload();
       }
-    };
-    return () => ws.close();
-  }, [token]);
+    });
+  }, [onMessage]);
 
   async function refreshUnread() {
     setUnread(await unreadNotificationCount());
@@ -78,9 +74,14 @@ export function NotificationCenterPage() {
 
   return (
     <div>
-      <Space align="center">
-        <Typography.Title level={3}>通知中心</Typography.Title>
+      <Space align="center" className="page-status-strip">
+        <span>未读</span>
         <Badge count={unread} overflowCount={99} />
+        <Tooltip title={wsConnected ? '实时连接正常' : '实时连接已断开'}>
+          <Tag color={wsConnected ? 'green' : 'red'} style={{ marginLeft: 8 }}>
+            <WifiOutlined /> {wsConnected ? '已连接' : '未连接'}
+          </Tag>
+        </Tooltip>
       </Space>
       <ProTable<NotificationRow>
         actionRef={actionRef}

@@ -75,6 +75,9 @@ func (h *Handler) ListCategories(c echo.Context) error {
 		}
 		items = append(items, item)
 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
 	return response.OK(c, items)
 }
 
@@ -93,6 +96,9 @@ func (h *Handler) TreeCategories(c echo.Context) error {
 			return err
 		}
 		all = append(all, item)
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 
 	tree := buildTree(all, nil)
@@ -248,6 +254,9 @@ func (h *Handler) ListArticles(c echo.Context) error {
 		}
 		items = append(items, item)
 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
 	return response.OK(c, response.Page[ArticleRow]{Items: items, Page: page, PageSize: pageSize, Total: total})
 }
 
@@ -363,6 +372,9 @@ func (h *Handler) ListFAQs(c echo.Context) error {
 			return err
 		}
 		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 	return response.OK(c, response.Page[FAQRow]{Items: items, Page: page, PageSize: pageSize, Total: total})
 }

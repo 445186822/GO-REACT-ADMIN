@@ -1,5 +1,5 @@
 ﻿import { ProColumns, ProTable } from '@ant-design/pro-components';
-import { Tag, Typography, message } from 'antd';
+import { Tag, message } from 'antd';
 import { listAuditLogs, type AuditLogRow } from '../../../api/auditLogs';
 import { ExportButton } from '../../../components/ExportButton';
 import { exportExcel } from '../../../utils/exportExcel';
@@ -47,7 +47,6 @@ export function AuditLogPage() {
 
   return (
     <div>
-      <Typography.Title level={3}>操作日志</Typography.Title>
       <ProTable<AuditLogRow>
         rowKey="id"
         columns={columns}

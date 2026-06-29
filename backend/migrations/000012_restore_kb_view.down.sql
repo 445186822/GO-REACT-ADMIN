@@ -1,0 +1,1 @@
+-- Intentionally left blank. Restoring kb:view is a data repair for existing demo databases.

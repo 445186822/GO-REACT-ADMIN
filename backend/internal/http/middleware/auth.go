@@ -101,11 +101,17 @@ func PermissionForRequest(method string, rawPath string) string {
 			return "settings:view"
 		}
 		return "settings:update"
-	case strings.HasPrefix(path, "/dict"), strings.HasPrefix(path, "/recycle-bin"), strings.HasPrefix(path, "/scheduler"):
+	case strings.HasPrefix(path, "/dashboard"):
 		if method == http.MethodGet {
-			return systemPagePermission(path)
+			return "dashboard"
 		}
 		return "settings:update"
+	case strings.HasPrefix(path, "/dict"):
+		return dictPermission(path, method)
+	case strings.HasPrefix(path, "/recycle-bin"):
+		return recyclePermission(path, method)
+	case strings.HasPrefix(path, "/scheduler"):
+		return schedulerPermission(path, method)
 	case strings.HasPrefix(path, "/monitor"):
 		return "monitor:view"
 	case strings.HasPrefix(path, "/kb"):
@@ -113,6 +119,8 @@ func PermissionForRequest(method string, rawPath string) string {
 			return "kb:view"
 		}
 		return "kb:update"
+	case path == "/todos":
+		return "todo:view"
 	case strings.HasPrefix(path, "/notifications"):
 		if method == http.MethodPost {
 			return "notification:create"
@@ -120,8 +128,6 @@ func PermissionForRequest(method string, rawPath string) string {
 		return "notification:view"
 	case strings.HasPrefix(path, "/message-templates"):
 		return permissionByMethod(method, "message-template:view", "message-template:create", "message-template:update", "message-template:delete")
-	case strings.HasPrefix(path, "/approval/templates"):
-		return permissionByMethod(method, "approval:view", "approval:template:create", "approval:template:update", "approval:template:delete")
 	case path == "/approval/instances":
 		return permissionByMethod(method, "approval:view", "approval:submit", "", "")
 	case strings.HasPrefix(path, "/approval/instances/:id/action"):
@@ -160,6 +166,52 @@ func permissionByMethod(method string, get string, post string, put string, del 
 		return del
 	default:
 		return ""
+	}
+}
+
+func dictPermission(path string, method string) string {
+	if method == http.MethodGet {
+		return "datadict:view"
+	}
+	switch method {
+	case http.MethodPost:
+		return "datadict:create"
+	case http.MethodPut, http.MethodPatch:
+		return "datadict:update"
+	case http.MethodDelete:
+		return "datadict:delete"
+	default:
+		return "settings:update"
+	}
+}
+
+func recyclePermission(path string, method string) string {
+	if method == http.MethodGet {
+		return "recycle:view"
+	}
+	switch {
+	case strings.HasSuffix(path, "/restore"):
+		return "recycle:restore"
+	case strings.Contains(path, "/purge-all"):
+		return "recycle:purge"
+	case strings.Contains(path, "/purge"):
+		return "recycle:purge"
+	default:
+		return "recycle:view"
+	}
+}
+
+func schedulerPermission(path string, method string) string {
+	if method == http.MethodGet {
+		return "scheduler:view"
+	}
+	switch {
+	case strings.HasSuffix(path, "/toggle"):
+		return "scheduler:toggle"
+	case strings.HasSuffix(path, "/run"):
+		return "scheduler:run"
+	default:
+		return permissionByMethod(method, "scheduler:view", "scheduler:create", "scheduler:update", "scheduler:delete")
 	}
 }
 

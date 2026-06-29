@@ -66,12 +66,12 @@ export function RecycleBinPage() {
       width: 160,
       render: (_, row) => (
         <Space>
-          <Permission code="settings:update">
+          <Permission code="recycle:restore">
             <Button type="link" size="small" icon={<RollbackOutlined />} onClick={() => handleRestore(row)}>
               恢复
             </Button>
           </Permission>
-          <Permission code="settings:update">
+          <Permission code="recycle:purge">
             <Button type="link" danger size="small" icon={<DeleteOutlined />} onClick={() => confirmPurge(row)}>
               彻底删除
             </Button>
@@ -97,9 +97,13 @@ export function RecycleBinPage() {
       content: `此操作不可逆，将永久删除「${row.summary}」。`,
       okButtonProps: { danger: true },
       onOk: async () => {
-        await purgeRecycled(row.id);
-        message.success('已永久删除');
-        actionRef.current?.reload();
+        try {
+          await purgeRecycled(row.id);
+          message.success('已永久删除');
+          actionRef.current?.reload();
+        } catch {
+          message.error('彻底删除失败，请稍后重试');
+        }
       },
     });
   }
@@ -110,9 +114,13 @@ export function RecycleBinPage() {
       content: '此操作不可逆，将永久删除回收站中的所有记录。',
       okButtonProps: { danger: true },
       onOk: async () => {
-        await purgeAllRecycled();
-        message.success('回收站已清空');
-        actionRef.current?.reload();
+        try {
+          await purgeAllRecycled();
+          message.success('回收站已清空');
+          actionRef.current?.reload();
+        } catch {
+          message.error('清空回收站失败，请稍后重试');
+        }
       },
     });
   }
@@ -123,25 +131,30 @@ export function RecycleBinPage() {
         actionRef={actionRef}
         columns={columns}
         request={async (params) => {
-          const res = await listRecycled({
-            source_table: params.source_table,
-            keyword: params.keyword,
-            page: params.current,
-            page_size: params.pageSize,
-          });
-          return { data: res.items, total: res.total, success: true };
+          try {
+            const res = await listRecycled({
+              source_table: params.source_table,
+              keyword: typeof params.summary === 'string' ? params.summary : undefined,
+              page: params.current,
+              page_size: params.pageSize,
+            });
+            return { data: res.items, total: res.total, success: true };
+          } catch {
+            message.error('加载回收站数据失败');
+            return { data: [], total: 0, success: false };
+          }
         }}
         rowKey="id"
         search={{ labelWidth: 'auto' }}
         headerTitle="回收站"
         toolBarRender={() => [
-          <Permission code="settings:update" key="clear">
+          <Permission code="recycle:purge" key="clear">
             <Button icon={<ClearOutlined />} danger onClick={confirmClearAll}>
               清空回收站
             </Button>
           </Permission>,
         ]}
-        pagination={{ defaultPageSize: 20 }}
+        pagination={{ defaultPageSize: 10 }}
       />
     </div>
   );

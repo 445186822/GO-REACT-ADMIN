@@ -13,6 +13,7 @@ func TestPermissionForRequestMapsEnterpriseActions(t *testing.T) {
 		{"DELETE", "/api/v1/workflows/12", "workflow:delete"},
 		{"POST", "/api/v1/workflows/12/run", "workflow:run"},
 		{"POST", "/api/v1/approval/instances/8/action", "approval:action"},
+		{"GET", "/api/v1/todos", "todo:view"},
 		{"PUT", "/api/v1/settings/system.name", "settings:update"},
 		{"GET", "/api/v1/kb/articles", "kb:view"},
 	}
@@ -27,5 +28,11 @@ func TestPermissionForRequestMapsEnterpriseActions(t *testing.T) {
 func TestPermissionForRequestAllowsUnmappedRoutes(t *testing.T) {
 	if got := PermissionForRequest("GET", "/api/v1/health"); got != "" {
 		t.Fatalf("PermissionForRequest returned %q, want empty permission", got)
+	}
+}
+
+func TestPermissionForRequestDoesNotExposeApprovalTemplates(t *testing.T) {
+	if got := PermissionForRequest("GET", "/api/v1/approval/templates"); got != "" {
+		t.Fatalf("PermissionForRequest approval templates = %q, want empty permission", got)
 	}
 }

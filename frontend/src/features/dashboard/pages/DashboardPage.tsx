@@ -1,56 +1,262 @@
-import { Card, Col, Row, Statistic, Table, Tag, Typography } from 'antd';
+import { useEffect, useState } from 'react';
+import { Button, Card, Col, Row, Skeleton, Statistic, Typography } from 'antd';
+import {
+  ClockCircleOutlined,
+  PlayCircleOutlined,
+  ReloadOutlined,
+  RocketOutlined,
+  TeamOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
+import ReactECharts from 'echarts-for-react';
+import { DashboardStats, getDashboardStats } from '../../../api/dashboard';
 
-const rows = [
-  { key: 'user', module: '用户管理', capability: '真实 CRUD、按钮权限、软删除', status: '已实现' },
-  { key: 'customer', module: '客户管理', capability: '业务 CRUD、数据权限、负责人/部门过滤', status: '已实现' },
-  { key: 'rbac', module: '权限模型', capability: '动态菜单、角色、按钮权限、数据范围', status: '已实现' },
-  { key: 'realtime', module: '实时能力', capability: 'WebSocket 收发、服务端推送', status: '已实现' },
-  { key: 'sse', module: 'AI 流式输出', capability: 'SSE 分段响应、前端流式渲染', status: '已实现' },
+/** Chart colour palette */
+const COLORS = ['#1677ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1', '#13c2c2'];
+
+/** Hardcoded module overview data (no backend endpoint yet) */
+const MODULE_OVERVIEW = [
+  { name: '用户管理', features: 6 },
+  { name: '客户管理', features: 8 },
+  { name: '权限模型', features: 5 },
+  { name: '实时能力', features: 4 },
+  { name: 'AI 流式输出', features: 3 },
 ];
 
+/** Stat card descriptors */
+const STAT_CARDS = [
+  { title: '用户数', icon: <UserOutlined />, field: 'user_count' as const },
+  { title: '客户数', icon: <TeamOutlined />, field: 'customer_count' as const },
+  { title: '今日请求', icon: <RocketOutlined />, field: 'today_requests' as const },
+  { title: '待审批', icon: <ClockCircleOutlined />, field: 'pending_approvals' as const },
+  { title: '运行任务', icon: <PlayCircleOutlined />, field: 'running_tasks' as const },
+];
+
+/** Map backend status code to Chinese label */
+const APPROVAL_LABEL: Record<string, string> = {
+  PENDING: '待审批',
+  APPROVED: '已通过',
+  REJECTED: '已拒绝',
+};
+
+function useDashboardStats() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getDashboardStats();
+      setStats(data);
+    } catch {
+      setError('获取工作台数据失败，请稍后重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetch();
+  }, []);
+
+  return { stats, loading, error, retry: fetch };
+}
+
 export function DashboardPage() {
+  const { stats, loading, error, retry } = useDashboardStats();
+
+  /* ---- ECharts options ---- */
+
+  const lineOption = stats && {
+    tooltip: { trigger: 'axis' as const },
+    grid: { top: 20, right: 20, bottom: 30, left: 55 },
+    xAxis: {
+      type: 'category' as const,
+      data: stats.request_trend.map((i) => i.date.slice(5)),
+      axisLabel: { color: '#8c8c8c' },
+      axisLine: { lineStyle: { color: '#e8e8e8' } },
+    },
+    yAxis: {
+      type: 'value' as const,
+      axisLabel: { color: '#8c8c8c' },
+      splitLine: { lineStyle: { color: '#f0f0f0' } },
+    },
+    series: [
+      {
+        type: 'line' as const,
+        data: stats.request_trend.map((i) => i.count),
+        smooth: true,
+        lineStyle: { color: COLORS[0], width: 3 },
+        areaStyle: {
+          color: {
+            type: 'linear' as const,
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(22,119,255,0.25)' },
+              { offset: 1, color: 'rgba(22,119,255,0.02)' },
+            ],
+          },
+        },
+        itemStyle: { color: COLORS[0] },
+      },
+    ],
+  };
+
+  const pieOption = stats && {
+    tooltip: { trigger: 'item' as const, formatter: '{b}: {c} ({d}%)' },
+    series: [
+      {
+        type: 'pie' as const,
+        data: stats.customer_level_dist.map((d, i) => ({
+          name: d.level,
+          value: d.count,
+          itemStyle: { color: COLORS[i % COLORS.length] },
+        })),
+        roseType: 'radius' as const,
+        radius: ['30%', '65%'],
+        label: { color: '#595959' },
+        labelLine: { lineStyle: { color: '#d9d9d9' } },
+      },
+    ],
+  };
+
+  const approvalBarOption = stats && {
+    tooltip: { trigger: 'axis' as const },
+    grid: { top: 20, right: 20, bottom: 30, left: 55 },
+    xAxis: {
+      type: 'category' as const,
+      data: stats.approval_status_dist.map(
+        (d) => APPROVAL_LABEL[d.status] ?? d.status,
+      ),
+      axisLabel: { color: '#8c8c8c' },
+      axisLine: { lineStyle: { color: '#e8e8e8' } },
+    },
+    yAxis: {
+      type: 'value' as const,
+      axisLabel: { color: '#8c8c8c' },
+      splitLine: { lineStyle: { color: '#f0f0f0' } },
+    },
+    series: [
+      {
+        type: 'bar' as const,
+        data: stats.approval_status_dist.map((d, i) => ({
+          value: d.count,
+          itemStyle: { color: COLORS[i % COLORS.length] },
+        })),
+        barWidth: '40%',
+      },
+    ],
+  };
+
+  const moduleBarOption = {
+    tooltip: { trigger: 'axis' as const },
+    grid: { top: 20, right: 20, bottom: 30, left: 55 },
+    xAxis: {
+      type: 'category' as const,
+      data: MODULE_OVERVIEW.map((m) => m.name),
+      axisLabel: { color: '#8c8c8c' },
+      axisLine: { lineStyle: { color: '#e8e8e8' } },
+    },
+    yAxis: {
+      type: 'value' as const,
+      axisLabel: { color: '#8c8c8c' },
+      splitLine: { lineStyle: { color: '#f0f0f0' } },
+    },
+    series: [
+      {
+        type: 'bar' as const,
+        data: MODULE_OVERVIEW.map((m, i) => ({
+          value: m.features,
+          itemStyle: { color: COLORS[i % COLORS.length] },
+        })),
+        barWidth: '40%',
+      },
+    ],
+  };
+
+  /* ---- Render helpers ---- */
+
+  const renderChartCard = (
+    title: string,
+    option: Record<string, unknown> | null,
+  ) => (
+    <Card title={title} styles={{ body: { padding: 0 } }}>
+      {loading ? (
+        <Skeleton active style={{ margin: 24 }} />
+      ) : (
+        <ReactECharts option={option!} style={{ height: 300 }} />
+      )}
+    </Card>
+  );
+
+  /* ---- Main render ---- */
+
+  if (error) {
+    return (
+      <div>
+        <div style={{ textAlign: 'center', padding: 80 }}>
+          <Typography.Text type="danger" style={{ fontSize: 16 }}>
+            {error}
+          </Typography.Text>
+          <br />
+          <Button
+            type="primary"
+            icon={<ReloadOutlined />}
+            onClick={retry}
+            style={{ marginTop: 16 }}
+          >
+            重试
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <Typography.Title level={3}>工作台</Typography.Title>
+    <div style={{ padding: '0 0 24px' }}>
+      {/* ---- Stat cards ---- */}
       <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic title="用户数" value={3} />
-          </Card>
+        {STAT_CARDS.map((card) => (
+          <Col xs={24} sm={12} lg={6} key={card.field}>
+            <Card>
+              {loading ? (
+                <Skeleton active paragraph={false} />
+              ) : (
+                <Statistic
+                  title={card.title}
+                  value={stats![card.field]}
+                  prefix={card.icon}
+                />
+              )}
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      {/* ---- Charts row 1 ---- */}
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col xs={24} lg={12}>
+          {renderChartCard('近7天请求趋势', lineOption)}
         </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic title="客户数" value={4} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic title="权限点" value={20} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic title="菜单项" value={26} />
-          </Card>
+        <Col xs={24} lg={12}>
+          {renderChartCard('客户级别分布', pieOption)}
         </Col>
       </Row>
-      <Card style={{ marginTop: 16 }}>
-        <Table
-          rowKey="key"
-          pagination={false}
-          dataSource={rows}
-          columns={[
-            { title: '模块', dataIndex: 'module', width: 160 },
-            { title: '能力点', dataIndex: 'capability' },
-            {
-              title: '状态',
-              dataIndex: 'status',
-              width: 120,
-              render: (value) => <Tag color="green">{value}</Tag>,
-            },
-          ]}
-        />
-      </Card>
+
+      {/* ---- Charts row 2 ---- */}
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col xs={24} lg={12}>
+          {renderChartCard('审批状态统计', approvalBarOption)}
+        </Col>
+        <Col xs={24} lg={12}>
+          {renderChartCard('模块功能概览', moduleBarOption)}
+        </Col>
+      </Row>
     </div>
   );
 }

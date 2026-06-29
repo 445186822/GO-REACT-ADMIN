@@ -17,7 +17,7 @@ import { Permission } from '../../../components/Permission';
 import { exportExcel } from '../../../utils/exportExcel';
 import { groupSettingsForView, settingValuePreview } from '../settingsView';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 export function SettingsPage() {
   const actionRef = useRef<ActionType>(null);
@@ -83,32 +83,31 @@ export function SettingsPage() {
   }
 
   async function exportSettings() {
-    const data = await listSettings();
-    await exportExcel<SettingRow>(
-      'settings.xlsx',
-      'Settings',
-      [
-        { title: 'ID', dataIndex: 'id' },
-        { title: '分组', dataIndex: 'group_key' },
-        { title: '键', dataIndex: 'setting_key' },
-        { title: '值', dataIndex: 'setting_value' },
-        { title: '类型', dataIndex: 'value_type' },
-        { title: '说明', dataIndex: 'description' },
-        { title: '加密', dataIndex: 'is_encrypted' },
-        { title: '更新时间', dataIndex: 'updated_at' },
-      ],
-      data,
-    );
-    message.success('系统配置 Excel 已生成');
+    try {
+      await exportExcel<SettingRow>(
+        'settings.xlsx',
+        'Settings',
+        [
+          { title: 'ID', dataIndex: 'id' },
+          { title: '分组', dataIndex: 'group_key' },
+          { title: '键', dataIndex: 'setting_key' },
+          { title: '值', dataIndex: 'setting_value' },
+          { title: '类型', dataIndex: 'value_type' },
+          { title: '说明', dataIndex: 'description' },
+          { title: '加密', dataIndex: 'is_encrypted' },
+          { title: '更新时间', dataIndex: 'updated_at' },
+        ],
+        rows,
+      );
+      message.success('系统配置 Excel 已生成');
+    } catch {
+      message.error('导出失败');
+    }
   }
 
   return (
     <div className="settings-workspace">
       <div className="settings-header">
-        <div>
-          <Title level={3}>系统配置</Title>
-          <Text type="secondary">集中维护运行参数、安全策略、文件限制、通知和 AI 能力，不再暴露难以理解的空白配置表。</Text>
-        </div>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={loadSettings}>刷新</Button>
           <ExportButton onClick={exportSettings}>导出 Excel</ExportButton>

@@ -40,6 +40,25 @@ export async function markAllNotificationsRead() {
   return http.put('/notifications/read-all');
 }
 
+export type TodoRow = {
+  id: number;
+  source_module: 'approval';
+  source_id: number;
+  title: string;
+  biz_type: string;
+  biz_id?: string | null;
+  applicant: string;
+  current_step: number;
+  current_step_name: string;
+  assignee: string;
+  created_at: string;
+};
+
+export async function listTodos() {
+  const res = await http.get<unknown, { data: TodoRow[] }>('/todos');
+  return res.data;
+}
+
 export type MessageTemplateRow = {
   id: number;
   code: string;
@@ -69,20 +88,10 @@ export async function deleteMessageTemplate(id: number) {
   return http.delete(`/message-templates/${id}`);
 }
 
-export type ApprovalTemplateRow = {
-  id: number;
-  name: string;
-  biz_type: string;
-  description?: string | null;
-  steps: unknown[];
-  workflow_definition_id?: number | null;
-  status: string;
-  updated_at: string;
-};
-
 export type ApprovalInstanceRow = {
   id: number;
-  template_id?: number | null;
+  workflow_definition_id: number;
+  workflow: string;
   title: string;
   biz_type: string;
   biz_id?: string | null;
@@ -91,27 +100,25 @@ export type ApprovalInstanceRow = {
   current_step: number;
   form_data: Record<string, unknown>;
   created_at: string;
+  actions?: ApprovalActionRow[];
 };
 
-export async function listApprovalTemplates(params?: { keyword?: string; biz_type?: string; status?: string }) {
-  const res = await http.get<unknown, { data: ApprovalTemplateRow[] }>('/approval/templates', { params });
-  return res.data;
-}
-
-export async function createApprovalTemplate(data: Partial<ApprovalTemplateRow>) {
-  return http.post('/approval/templates', data);
-}
-
-export async function updateApprovalTemplate(id: number, data: Partial<ApprovalTemplateRow>) {
-  return http.put(`/approval/templates/${id}`, data);
-}
-
-export async function deleteApprovalTemplate(id: number) {
-  return http.delete(`/approval/templates/${id}`);
-}
+export type ApprovalActionRow = {
+  id: number;
+  step_index: number;
+  approver: string;
+  action: 'APPROVE' | 'REJECT';
+  comment?: string | null;
+  created_at: string;
+};
 
 export async function listApprovalInstances(params?: { keyword?: string; biz_type?: string; status?: string }) {
   const res = await http.get<unknown, { data: ApprovalInstanceRow[] }>('/approval/instances', { params });
+  return res.data;
+}
+
+export async function getApprovalInstance(id: number) {
+  const res = await http.get<unknown, { data: ApprovalInstanceRow }>(`/approval/instances/${id}`);
   return res.data;
 }
 

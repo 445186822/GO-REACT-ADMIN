@@ -19,7 +19,8 @@ Do not add placeholder routes. If a module is not backed by real database tables
 - `/business/customers`: customer CRUD, data-scope API integration, backend XLSX export.
 - `/collaboration/notifications`: persisted notification list, unread state, read actions, create notification, and WebSocket unread updates.
 - `/collaboration/message-templates`: message template CRUD with JSON variables.
-- `/collaboration/approvals`: approval template management, approval instance submission, approve, and reject actions.
+- `/collaboration/todos`: current user's actionable workflow approval tasks.
+- `/collaboration/approvals`: workflow-backed approval instance submission, approve, reject, detail, and history views.
 - `/collaboration/workflows`: workflow definition CRUD, manual run, and run instance list.
 - `/collaboration/ai-assistant`: persisted AI chat messages and real provider forwarding through backend configuration.
 - `/files`: upload, list, backend file download, soft delete, frontend file-list XLSX export.

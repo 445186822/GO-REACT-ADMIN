@@ -6,6 +6,7 @@ import {
   BookOutlined,
   BranchesOutlined,
   CheckSquareOutlined,
+  ClockCircleOutlined,
   ContactsOutlined,
   ControlOutlined,
   DashboardOutlined,
@@ -32,7 +33,9 @@ import { Avatar, Badge, Breadcrumb, Button, ColorPicker, Divider, Drawer, Dropdo
 import { useEffect, useMemo, useState, type ReactNode, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { unreadNotificationCount } from '../api/collaboration';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { FloatingAIAssistant } from '../components/FloatingAIAssistant';
+import { useNotificationWebSocket } from '../hooks/useNotificationWebSocket';
 import { useAppearanceStore, type ContentPadding, type Density, type HeaderStyle, type LayoutMode, type PageTone, type SidebarTheme, type TabStyle } from '../store/appearanceStore';
 import { type MenuNode, useAuthStore } from '../store/authStore';
 
@@ -80,18 +83,24 @@ export function BasicLayout() {
   }, []);
 
   const removeTab = useCallback((key: string) => {
-    setTabs((prev) => {
-      const idx = prev.findIndex((t) => t.key === key);
-      const next = prev.filter((t) => t.key !== key);
-      if (key === activeTab && next.length > 0) {
-        const newIdx = Math.min(idx, next.length - 1);
-        const newTab = next[newIdx];
-        setActiveTab(newTab.key);
-        navigate(newTab.path);
+    const currentTabs = tabs;
+    const closingActive = key === activeTab;
+    let fallback: { key: string; path: string } | null = null;
+    if (closingActive) {
+      const remaining = currentTabs.filter((t) => t.key !== key);
+      if (remaining.length > 0) {
+        const idx = currentTabs.findIndex((t) => t.key === key);
+        fallback = remaining[Math.min(idx, remaining.length - 1)];
       }
-      return next;
-    });
-  }, [activeTab, navigate]);
+    }
+
+    setTabs((prev) => prev.filter((t) => t.key !== key));
+
+    if (fallback) {
+      setActiveTab(fallback.key);
+      navigate(fallback.path);
+    }
+  }, [activeTab, navigate, tabs]);
 
   const activateTab = useCallback((tab: TabItem | undefined) => {
     if (!tab) {
@@ -106,45 +115,72 @@ export function BasicLayout() {
   }, [flatMenus, navigate]);
 
   const closeCurrentTab = useCallback((key = activeTab) => {
-    setTabs((prev) => {
-      const index = prev.findIndex((tab) => tab.key === key);
-      const next = prev.filter((tab) => tab.key !== key);
-      if (key === activeTab) {
-        activateTab(next[Math.min(index, next.length - 1)]);
+    const currentTabs = tabs;
+    const closingActive = key === activeTab;
+    let fallback: TabItem | undefined;
+    if (closingActive) {
+      const remaining = currentTabs.filter((tab) => tab.key !== key);
+      if (remaining.length > 0) {
+        const index = currentTabs.findIndex((tab) => tab.key === key);
+        fallback = remaining[Math.min(index, remaining.length - 1)];
       }
-      return next;
-    });
-  }, [activateTab, activeTab]);
+    }
+
+    setTabs((prev) => prev.filter((tab) => tab.key !== key));
+
+    if (closingActive) {
+      if (fallback) {
+        setActiveTab(fallback.key);
+        navigate(fallback.path);
+      } else {
+        const dash = flatMenus.find((m) => m.path === '/dashboard') ?? flatMenus[0];
+        if (dash) navigate(dash.path);
+      }
+    }
+  }, [activeTab, navigate, tabs, flatMenus]);
 
   const closeOtherTabs = useCallback((key = activeTab) => {
+    const currentTabs = tabs;
+    const target = currentTabs.find((tab) => tab.key === key);
     setTabs((prev) => prev.filter((tab) => tab.key === key));
-    const target = tabs.find((tab) => tab.key === key);
     activateTab(target);
   }, [activateTab, activeTab, tabs]);
 
   const closeTabsToLeft = useCallback((key = activeTab) => {
+    const index = tabs.findIndex((tab) => tab.key === key);
+    if (index <= 0) return;
+    const next = tabs.slice(index);
+    const activeInNext = next.some((tab) => tab.key === activeTab);
+
     setTabs((prev) => {
-      const index = prev.findIndex((tab) => tab.key === key);
-      if (index <= 0) return prev;
-      const next = prev.slice(index);
-      if (!next.some((tab) => tab.key === activeTab)) {
-        activateTab(next[0]);
-      }
-      return next;
+      const idx = prev.findIndex((tab) => tab.key === key);
+      if (idx <= 0) return prev;
+      return prev.slice(idx);
     });
-  }, [activateTab, activeTab]);
+
+    if (!activeInNext && next.length > 0) {
+      setActiveTab(next[0].key);
+      navigate(next[0].path);
+    }
+  }, [activeTab, navigate, tabs]);
 
   const closeTabsToRight = useCallback((key = activeTab) => {
+    const index = tabs.findIndex((tab) => tab.key === key);
+    if (index < 0 || index >= tabs.length - 1) return;
+    const next = tabs.slice(0, index + 1);
+    const activeInNext = next.some((tab) => tab.key === activeTab);
+
     setTabs((prev) => {
-      const index = prev.findIndex((tab) => tab.key === key);
-      if (index < 0 || index >= prev.length - 1) return prev;
-      const next = prev.slice(0, index + 1);
-      if (!next.some((tab) => tab.key === activeTab)) {
-        activateTab(next[next.length - 1]);
-      }
-      return next;
+      const idx = prev.findIndex((tab) => tab.key === key);
+      if (idx < 0 || idx >= prev.length - 1) return prev;
+      return prev.slice(0, idx + 1);
     });
-  }, [activateTab, activeTab]);
+
+    if (!activeInNext && next.length > 0) {
+      setActiveTab(next[next.length - 1].key);
+      navigate(next[next.length - 1].path);
+    }
+  }, [activeTab, navigate, tabs]);
 
   const closeAllTabs = useCallback(() => {
     setTabs([]);
@@ -187,21 +223,18 @@ export function BasicLayout() {
     void unreadNotificationCount().then(setUnreadCount).catch(() => setUnreadCount(0));
   }, []);
 
+  // Shared WebSocket for notification badge
+  const { onMessage: onWsMessage } = useNotificationWebSocket();
   useEffect(() => {
-    if (!accessToken) return;
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/notifications/ws?token=${encodeURIComponent(accessToken)}`);
-    ws.onmessage = (event) => {
-      const payload = JSON.parse(event.data);
-      if (payload.event === 'unread_count') {
-        setUnreadCount(payload.count ?? 0);
+    onWsMessage((data) => {
+      if (data.event === 'unread_count') {
+        setUnreadCount(data.count ?? 0);
       }
-      if (payload.event === 'notifications_changed') {
+      if (data.event === 'notifications_changed') {
         void unreadNotificationCount().then(setUnreadCount).catch(() => setUnreadCount(0));
       }
-    };
-    return () => ws.close();
-  }, [accessToken]);
+    });
+  }, [onWsMessage]);
 
   return (
     <Layout className={`app-shell app-shell-${layoutMode}`}>
@@ -289,7 +322,7 @@ export function BasicLayout() {
             />
             <Dropdown
               menu={{
-                items: [{ key: 'logout', icon: <LogoutOutlined />, label: 'Logout' }],
+                items: [{ key: 'logout', icon: <LogoutOutlined />, label: '退出登录' }],
                 onClick: () => {
                   clearSession();
                   navigate('/login');
@@ -358,7 +391,9 @@ export function BasicLayout() {
             />
           )}
           <div className={`page-body page-body-${contentPadding} page-body-${pageTone}`}>
-            <Outlet key={`${location.pathname}:${pageRefreshKey}`} />
+            <ErrorBoundary>
+              <Outlet key={`${location.pathname}:${pageRefreshKey}`} />
+            </ErrorBoundary>
           </div>
           <AppearanceDrawer open={appearanceOpen} onClose={() => setAppearanceOpen(false)} />
           <FloatingAIAssistant />
@@ -536,6 +571,7 @@ const iconMap: Record<string, ReactNode> = {
   BookOutlined: <BookOutlined />,
   BranchesOutlined: <BranchesOutlined />,
   CheckSquareOutlined: <CheckSquareOutlined />,
+  ClockCircleOutlined: <ClockCircleOutlined />,
   ContactsOutlined: <ContactsOutlined />,
   ControlOutlined: <ControlOutlined />,
   DashboardOutlined: <DashboardOutlined />,
@@ -559,7 +595,7 @@ function toMenuItem(menu: MenuNode): any {
   const key = menu.path ? normalizePath(menu.path) : menu.code;
   return {
     key,
-    icon: menu.icon ? iconMap[menu.icon] : undefined,
+    icon: menu.icon ? (iconMap[menu.icon] ?? <AppstoreOutlined />) : undefined,
     label: menu.name,
     children: menu.children?.length ? menu.children.map(toMenuItem) : undefined,
     disabled: !menu.path && !menu.children?.length,

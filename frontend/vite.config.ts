@@ -13,7 +13,11 @@ export default defineConfig({
     host: '127.0.0.1',
     port: devPort,
     proxy: {
-      '/api': apiProxyTarget,
+      '/api': {
+        target: apiProxyTarget,
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
   build: {

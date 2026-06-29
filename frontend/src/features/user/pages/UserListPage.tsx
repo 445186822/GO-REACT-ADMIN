@@ -1,8 +1,8 @@
-﻿import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+﻿import { DeleteOutlined, EditOutlined, KeyOutlined, PlusOutlined } from '@ant-design/icons';
 import { ModalForm, ProColumns, ProFormSelect, ProFormText, ProTable, type ActionType } from '@ant-design/pro-components';
-import { App, Button, Space, Tag, Typography, message } from 'antd';
+import { App, Button, Input, Modal, Space, Tag, message } from 'antd';
 import { useRef, useState } from 'react';
-import { createUser, deleteUser, listUsers, updateUser, type UserForm, type UserRow } from '../../../api/users';
+import { createUser, deleteUser, listUsers, resetUserPassword, updateUser, type UserForm, type UserRow } from '../../../api/users';
 import { Permission } from '../../../components/Permission';
 import { ExportButton } from '../../../components/ExportButton';
 import { exportExcel } from '../../../utils/exportExcel';
@@ -12,6 +12,9 @@ export function UserListPage() {
   const actionRef = useRef<ActionType>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
+  const [resetPwdUser, setResetPwdUser] = useState<UserRow | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   const columns: ProColumns<UserRow>[] = [
     { title: '用户名', dataIndex: 'username', copyable: true },
@@ -32,12 +35,17 @@ export function UserListPage() {
     {
       title: '操作',
       valueType: 'option',
-      width: 160,
+      width: 240,
       render: (_, row) => (
         <Space>
           <Permission code="user:update">
             <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(row)}>
               编辑
+            </Button>
+          </Permission>
+          <Permission code="user:update">
+            <Button type="link" size="small" icon={<KeyOutlined />} onClick={() => { setResetPwdUser(row); setNewPassword(''); }}>
+              重置密码
             </Button>
           </Permission>
           <Permission code="user:delete">
@@ -104,8 +112,7 @@ export function UserListPage() {
   }
 
   return (
-    <div>
-      <Typography.Title level={3}>用户管理</Typography.Title>
+    <div style={{ padding: '0 0 24px' }}>
       <ProTable<UserRow>
         actionRef={actionRef}
         rowKey="id"
@@ -158,6 +165,17 @@ export function UserListPage() {
         <ProFormText name="email" label="邮箱" />
         <ProFormText name="phone" label="手机" />
         <ProFormSelect
+          name="role_id"
+          label="角色"
+          allowClear
+          options={[
+            { label: '管理员', value: 1 },
+            { label: '普通用户', value: 2 },
+            { label: '访客', value: 3 },
+          ]}
+          placeholder="选择用户角色"
+        />
+        <ProFormSelect
           name="status"
           label="状态"
           options={[
@@ -166,7 +184,41 @@ export function UserListPage() {
           ]}
         />
       </ModalForm>
+
+      {/* Password Reset Modal */}
+      <Modal
+        title={`重置密码 - ${resetPwdUser?.display_name || ''}`}
+        open={Boolean(resetPwdUser)}
+        onCancel={() => { setResetPwdUser(null); setNewPassword(''); }}
+        confirmLoading={resetting}
+        onOk={async () => {
+          if (!resetPwdUser || !newPassword.trim()) {
+            message.warning('请输入新密码');
+            return;
+          }
+          if (newPassword.trim().length < 6) {
+            message.warning('密码长度不能少于6位');
+            return;
+          }
+          setResetting(true);
+          try {
+            await resetUserPassword(resetPwdUser.id, newPassword.trim());
+            message.success('密码已重置');
+            setResetPwdUser(null);
+            setNewPassword('');
+          } catch {
+            message.error('密码重置失败');
+          } finally {
+            setResetting(false);
+          }
+        }}
+      >
+        <Input.Password
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          placeholder="输入新密码（至少6位）"
+        />
+      </Modal>
     </div>
   );
 }
-

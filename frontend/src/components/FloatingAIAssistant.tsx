@@ -1,25 +1,35 @@
-import { ClearOutlined, CloseOutlined, RobotOutlined, SendOutlined, UserOutlined } from '@ant-design/icons';
-import { Avatar, Button, Input, Space, Spin, Typography } from 'antd';
+import {
+  ClearOutlined,
+  CloseOutlined,
+  DeleteOutlined,
+  PlusOutlined,
+  RobotOutlined,
+  SendOutlined,
+  SwapOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
+import { Avatar, Button, Dropdown, Input, Space, Typography } from 'antd';
+import type { MenuProps } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { sendAssistantMessage } from '../api/assistant';
+import { useAIChat } from '../features/collaboration/hooks/useAIChat';
 
 const { Text } = Typography;
 
-type ChatMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-};
-
-const welcomeMessage: ChatMessage = {
-  role: 'assistant',
-  content: '你好，我是 AI 智能助手。可以帮助你解答系统使用、数据分析、文档和工作流相关问题。',
-};
-
 export function FloatingAIAssistant() {
+  const {
+    messages,
+    loading,
+    conversations,
+    activeId,
+    sendMessage,
+    newConversation,
+    switchConversation,
+    deleteConversation,
+    clearMessages,
+  } = useAIChat();
+
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([welcomeMessage]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,40 +38,69 @@ export function FloatingAIAssistant() {
     }
   }, [messages, open]);
 
-  async function send() {
-    const text = input.trim();
-    if (!text || loading) return;
+  // Close on Escape key
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open]);
 
-    const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: text }];
-    const assistantIdx = nextMessages.length;
-    setMessages([...nextMessages, { role: 'assistant', content: '' }]);
+  async function handleSend() {
+    const text = input;
     setInput('');
-    setLoading(true);
+    await sendMessage(text);
+  }
 
-    try {
-      const reply = await sendAssistantMessage(text);
-      setMessages((prev) => {
-        const updated = [...prev];
-        updated[assistantIdx] = { role: 'assistant', content: reply };
-        return updated;
-      });
-    } catch {
-      setMessages((prev) => {
-        const updated = [...prev];
-        updated[assistantIdx] = {
-          role: 'assistant',
-          content: 'AI 服务暂时不可用，请检查后端服务和 AI 配置后再试。',
-        };
-        return updated;
-      });
-    } finally {
-      setLoading(false);
+  function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (!event.shiftKey && event.key === 'Enter') {
+      event.preventDefault();
+      void handleSend();
     }
   }
 
-  function clear() {
-    setMessages([welcomeMessage]);
-  }
+  const activeConv = conversations.find((c) => c.id === activeId);
+
+  const historyItems: MenuProps['items'] = conversations.map((conv) => ({
+    key: conv.id,
+    label: (
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 8,
+          maxWidth: 250,
+        }}
+      >
+        <span
+          style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            flex: 1,
+            fontWeight: conv.id === activeId ? 600 : 400,
+          }}
+        >
+          {conv.title}
+        </span>
+        {conversations.length > 1 && (
+          <DeleteOutlined
+            style={{ color: '#ff4d4f', fontSize: 12, cursor: 'pointer' }}
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteConversation(conv.id);
+            }}
+          />
+        )}
+      </div>
+    ),
+    onClick: () => switchConversation(conv.id),
+  }));
 
   if (!open) {
     return (
@@ -79,52 +118,95 @@ export function FloatingAIAssistant() {
 
   return (
     <div className="ai-float-panel">
+      {/* Header */}
       <div className="ai-float-header">
         <Space>
           <Avatar icon={<RobotOutlined />} style={{ background: '#1677ff' }} />
           <div>
             <Text strong>AI 智能助手</Text>
             <br />
-            <Text type="secondary" className="ai-float-subtitle">右下角浮窗</Text>
+            <Text type="secondary" className="ai-float-subtitle">
+              右下角浮窗
+            </Text>
           </div>
         </Space>
         <Space size={4}>
-          <Button type="text" size="small" icon={<ClearOutlined />} onClick={clear} aria-label="清空对话" />
-          <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setOpen(false)} aria-label="关闭 AI 助手" />
+          <Dropdown menu={{ items: historyItems }} trigger={['click']} placement="bottomRight">
+            <Button
+              type="text"
+              size="small"
+              icon={<SwapOutlined />}
+              aria-label="切换对话"
+              title="切换对话"
+            />
+          </Dropdown>
+          <Button
+            type="text"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={newConversation}
+            aria-label="新对话"
+            title="新对话"
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={<ClearOutlined />}
+            onClick={clearMessages}
+            aria-label="清空对话"
+            title="清空对话"
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={<CloseOutlined />}
+            onClick={() => setOpen(false)}
+            aria-label="关闭 AI 助手"
+            title="关闭"
+          />
         </Space>
       </div>
 
+      {/* Messages */}
       <div className="ai-float-messages">
         {messages.map((item, index) => (
-          <div key={`${item.role}-${index}`} className={`ai-float-message ai-float-message-${item.role}`}>
+          <div
+            key={`${item.role}-${index}`}
+            className={`ai-float-message ai-float-message-${item.role}`}
+          >
             <Avatar
               size={28}
               icon={item.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
               style={{ background: item.role === 'user' ? '#1677ff' : '#12b76a' }}
             />
             <div className="ai-float-bubble">
-              {item.content || (loading && index === messages.length - 1 ? <Spin size="small" /> : null)}
+              {item.content}
+              {loading && index === messages.length - 1 && (
+                <span className="ai-float-cursor" />
+              )}
             </div>
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
 
+      {/* Input */}
       <div className="ai-float-input">
         <Input.TextArea
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          onPressEnter={(event) => {
-            if (!event.shiftKey) {
-              event.preventDefault();
-              void send();
-            }
-          }}
+          onKeyDown={handleKeyDown}
           placeholder="输入消息，Enter 发送"
           autoSize={{ minRows: 1, maxRows: 3 }}
           disabled={loading}
         />
-        <Button type="primary" icon={<SendOutlined />} onClick={() => void send()} loading={loading} disabled={!input.trim()}>
+        <Button
+          type="primary"
+          icon={<SendOutlined />}
+          onClick={() => void handleSend()}
+          loading={loading}
+          disabled={!input.trim()}
+        >
           发送
         </Button>
       </div>

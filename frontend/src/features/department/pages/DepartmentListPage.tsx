@@ -1,5 +1,5 @@
 ﻿import { ProColumns, ProTable } from '@ant-design/pro-components';
-import { Tag, Typography, message } from 'antd';
+import { Tag, message } from 'antd';
 import { listDepartments, type DepartmentRow } from '../../../api/departments';
 import { ExportButton } from '../../../components/ExportButton';
 import { exportExcel } from '../../../utils/exportExcel';
@@ -35,7 +35,6 @@ export function DepartmentListPage() {
 
   return (
     <div>
-      <Typography.Title level={3}>部门管理</Typography.Title>
       <ProTable<DepartmentRow>
         rowKey="id"
         columns={columns}

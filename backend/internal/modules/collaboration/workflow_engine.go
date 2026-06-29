@@ -3,6 +3,7 @@ package collaboration
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 type workflowDefinitionSpec struct {
@@ -37,6 +38,11 @@ type executableWorkflowNode struct {
 	Assignee string
 }
 
+type approvalRuntimeStep struct {
+	Name     string
+	Assignee string
+}
+
 func executableWorkflowNodes(raw json.RawMessage) []executableWorkflowNode {
 	var spec workflowDefinitionSpec
 	if len(raw) == 0 || json.Unmarshal(raw, &spec) != nil {
@@ -63,6 +69,61 @@ func approvalWorkflowNodes(raw json.RawMessage) []executableWorkflowNode {
 		}
 	}
 	return result
+}
+
+func workflowHasNotificationNode(raw json.RawMessage) bool {
+	for _, node := range executableWorkflowNodes(raw) {
+		if node.NodeType == "notification" {
+			return true
+		}
+	}
+	return false
+}
+
+func approvalRuntimeSteps(workflowDefinition json.RawMessage) []approvalRuntimeStep {
+	nodes := approvalWorkflowNodes(workflowDefinition)
+	steps := make([]approvalRuntimeStep, 0, len(nodes))
+	for _, node := range nodes {
+		steps = append(steps, approvalRuntimeStep{Name: node.Name, Assignee: node.Assignee})
+	}
+	return steps
+}
+
+func assigneeMatchesRoles(assignee string, roles []string) bool {
+	labels := normalizeAssigneeLabels(assignee)
+	if len(labels) == 0 {
+		return true
+	}
+	roleSet := make(map[string]struct{}, len(roles))
+	for _, role := range roles {
+		if normalized := normalizeAssigneeLabel(role); normalized != "" {
+			roleSet[normalized] = struct{}{}
+		}
+	}
+	for _, label := range labels {
+		if _, ok := roleSet[label]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeAssigneeLabels(assignee string) []string {
+	parts := strings.FieldsFunc(assignee, func(r rune) bool {
+		return r == ',' || r == ';' || r == '，' || r == '；' || r == '|' || r == '/'
+	})
+	labels := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if normalized := normalizeAssigneeLabel(part); normalized != "" {
+			labels = append(labels, normalized)
+		}
+	}
+	return labels
+}
+
+func normalizeAssigneeLabel(value string) string {
+	value = strings.TrimSpace(strings.TrimPrefix(value, "role:"))
+	return strings.ToLower(value)
 }
 
 func orderWorkflowDefinitionNodes(spec workflowDefinitionSpec) []workflowDefinitionNode {

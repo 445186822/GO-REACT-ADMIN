@@ -96,6 +96,9 @@ func (h *Handler) List(c echo.Context) error {
 		item.DeletedAt = t.Format("2006-01-02 15:04:05")
 		items = append(items, item)
 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
 	return response.OK(c, response.Page[RecycledRow]{Items: items, Page: page, PageSize: pageSize, Total: total})
 }
 
