@@ -6,24 +6,29 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons';
 import { ProColumns, ProTable, type ActionType } from '@ant-design/pro-components';
-import { Button, Input, Modal, Space, Statistic, Tag, Typography, message } from 'antd';
-import { useRef, useState } from 'react';
+import { Button, Input, Modal, Space, Statistic, Tabs, Tag, Typography } from 'antd';
+import { message, notification } from '../../../utils/message';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { actionApproval, listTodos, type TodoRow } from '../../../api/collaboration';
 import { Permission } from '../../../components/Permission';
+import { operationColumnProps } from '../../../utils/tableColumns';
 import { buildApprovalActionPayload, requiresApprovalComment, type ApprovalAction } from '../approvalActions';
+import { countTodosByScope, todoScopeLabel, type TodoScope } from '../todoView';
 
 const { Text } = Typography;
 
 export function TodoCenterPage() {
   const actionRef = useRef<ActionType>(null);
   const navigate = useNavigate();
+  const [activeScope, setActiveScope] = useState<TodoScope>('pending');
   const [items, setItems] = useState<TodoRow[]>([]);
+  const [counts, setCounts] = useState({ pending: 0, done: 0 });
   const [pendingAction, setPendingAction] = useState<{ row: TodoRow; action: ApprovalAction } | null>(null);
   const [actionComment, setActionComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const columns: ProColumns<TodoRow>[] = [
+  const columns = useMemo<ProColumns<TodoRow>[]>(() => [
     {
       title: '待办标题',
       dataIndex: 'title',
@@ -53,28 +58,40 @@ export function TodoCenterPage() {
       ),
     },
     { title: '申请人', dataIndex: 'applicant', width: 120 },
-    { title: '到达时间', dataIndex: 'created_at', valueType: 'dateTime', width: 180, search: false },
+    ...(activeScope === 'done'
+      ? [
+          {
+            title: '处理结果',
+            dataIndex: 'action',
+            width: 110,
+            search: false,
+            render: (_: unknown, row: TodoRow) => <Tag color={row.action === 'APPROVE' ? 'green' : 'red'}>{row.action === 'APPROVE' ? '已通过' : '已驳回'}</Tag>,
+          } as ProColumns<TodoRow>,
+        ]
+      : []),
+    { title: activeScope === 'pending' ? '到达时间' : '处理时间', dataIndex: 'created_at', valueType: 'dateTime', width: 180, search: false },
     {
       title: '操作',
-      valueType: 'option',
-      width: 230,
+      ...operationColumnProps<TodoRow>(activeScope === 'pending' ? 240 : 140),
       render: (_, row) => (
-        <Space>
-          <Permission code="approval:action">
-            <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => openAction(row, 'APPROVE')}>
-              通过
-            </Button>
-            <Button type="link" danger size="small" icon={<CloseOutlined />} onClick={() => openAction(row, 'REJECT')}>
-              驳回
-            </Button>
-          </Permission>
+        <Space wrap={false} className="table-action-buttons">
+          {activeScope === 'pending' && (
+            <Permission code="approval:action">
+              <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => openAction(row, 'APPROVE')}>
+                通过
+              </Button>
+              <Button type="link" danger size="small" icon={<CloseOutlined />} onClick={() => openAction(row, 'REJECT')}>
+                驳回
+              </Button>
+            </Permission>
+          )}
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate('/collaboration/approvals')}>
             审批中心
           </Button>
         </Space>
       ),
     },
-  ];
+  ], [activeScope, navigate]);
 
   function openAction(row: TodoRow, action: ApprovalAction) {
     setPendingAction({ row, action });
@@ -95,7 +112,8 @@ export function TodoCenterPage() {
       setActionComment('');
       actionRef.current?.reload();
     } catch (err: unknown) {
-      message.error(requestErrorMessage(err, '处理待办失败'));
+      const msg = requestErrorMessage(err, '处理待办失败');
+      notification.error({ message: '操作失败', description: msg, duration: 0 });
     } finally {
       setSubmitting(false);
     }
@@ -104,20 +122,37 @@ export function TodoCenterPage() {
   return (
     <div style={{ paddingBottom: 24 }}>
       <Space style={{ marginBottom: 16 }} size={16}>
-        <Statistic title="我的待办" value={items.length} prefix={<ClockCircleOutlined />} />
+        <Statistic title="我的待办" value={counts.pending} prefix={<ClockCircleOutlined />} />
+        <Statistic title="我的已办" value={counts.done} />
         <Button icon={<ReloadOutlined />} onClick={() => actionRef.current?.reload()}>
           刷新
         </Button>
       </Space>
+      <Tabs
+        activeKey={activeScope}
+        onChange={(key) => {
+          setActiveScope(key as TodoScope);
+        }}
+        items={[
+          { key: 'pending', label: `${todoScopeLabel('pending')} (${counts.pending})` },
+          { key: 'done', label: `${todoScopeLabel('done')} (${counts.done})` },
+        ]}
+      />
 
       <ProTable<TodoRow>
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
+        params={{ activeScope }}
         request={async () => {
           try {
-            const data = await listTodos();
+            const inactiveScope: TodoScope = activeScope === 'pending' ? 'done' : 'pending';
+            const [data, inactiveData] = await Promise.all([
+              listTodos({ scope: activeScope }),
+              listTodos({ scope: inactiveScope }),
+            ]);
             setItems(data);
+            setCounts(countTodosByScope([...data, ...inactiveData]));
             return { data, success: true };
           } catch {
             message.error('加载待办失败');
@@ -125,6 +160,7 @@ export function TodoCenterPage() {
           }
         }}
         search={false}
+        scroll={{ x: activeScope === 'pending' ? 1060 : 980 }}
         options={{ reload: true, density: true }}
       />
 

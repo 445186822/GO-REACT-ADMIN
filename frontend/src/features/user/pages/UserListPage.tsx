@@ -1,11 +1,14 @@
-﻿import { DeleteOutlined, EditOutlined, KeyOutlined, PlusOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined, KeyOutlined, PlusOutlined } from '@ant-design/icons';
 import { ModalForm, ProColumns, ProFormSelect, ProFormText, ProTable, type ActionType } from '@ant-design/pro-components';
-import { App, Button, Input, Modal, Space, Tag, message } from 'antd';
-import { useRef, useState } from 'react';
+import { App, Button, Input, Modal, Space, Tag } from 'antd';
+import { message } from '../../../utils/message';
+import { useEffect, useRef, useState } from 'react';
 import { createUser, deleteUser, listUsers, resetUserPassword, updateUser, type UserForm, type UserRow } from '../../../api/users';
+import { listRoles, type RoleRow } from '../../../api/roles';
 import { Permission } from '../../../components/Permission';
 import { ExportButton } from '../../../components/ExportButton';
 import { exportExcel } from '../../../utils/exportExcel';
+import { operationColumnProps } from '../../../utils/tableColumns';
 
 export function UserListPage() {
   const { modal } = App.useApp();
@@ -15,10 +18,16 @@ export function UserListPage() {
   const [resetPwdUser, setResetPwdUser] = useState<UserRow | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [resetting, setResetting] = useState(false);
+  const [roles, setRoles] = useState<RoleRow[]>([]);
+
+  useEffect(() => {
+    listRoles().then(setRoles).catch(() => {});
+  }, []);
 
   const columns: ProColumns<UserRow>[] = [
     { title: '用户名', dataIndex: 'username', copyable: true },
     { title: '姓名', dataIndex: 'display_name' },
+    { title: '角色', dataIndex: 'roles', search: false },
     { title: '邮箱', dataIndex: 'email', search: false },
     { title: '手机', dataIndex: 'phone', search: false },
     { title: '部门', dataIndex: 'department', search: false },
@@ -34,10 +43,9 @@ export function UserListPage() {
     },
     {
       title: '操作',
-      valueType: 'option',
-      width: 240,
+      ...operationColumnProps<UserRow>(260),
       render: (_, row) => (
-        <Space>
+        <Space wrap={false} className="table-action-buttons">
           <Permission code="user:update">
             <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(row)}>
               编辑
@@ -101,6 +109,7 @@ export function UserListPage() {
         { title: 'ID', dataIndex: 'id' },
         { title: '用户名', dataIndex: 'username' },
         { title: '姓名', dataIndex: 'display_name' },
+        { title: '角色', dataIndex: 'roles' },
         { title: '邮箱', dataIndex: 'email' },
         { title: '手机', dataIndex: 'phone' },
         { title: '部门', dataIndex: 'department' },
@@ -110,6 +119,8 @@ export function UserListPage() {
     );
     message.success('用户 Excel 已生成');
   }
+
+  const roleOptions = roles.map((r) => ({ label: `${r.name} (${r.code})`, value: r.id }));
 
   return (
     <div style={{ padding: '0 0 24px' }}>
@@ -127,6 +138,7 @@ export function UserListPage() {
           return { data: data.items, total: data.total, success: true };
         }}
         pagination={{ defaultPageSize: 10, showSizeChanger: false }}
+        scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           <ExportButton key="export" onClick={exportUsers}>
             导出 Excel
@@ -167,13 +179,9 @@ export function UserListPage() {
         <ProFormSelect
           name="role_id"
           label="角色"
-          allowClear
-          options={[
-            { label: '管理员', value: 1 },
-            { label: '普通用户', value: 2 },
-            { label: '访客', value: 3 },
-          ]}
+          options={roleOptions}
           placeholder="选择用户角色"
+          allowClear
         />
         <ProFormSelect
           name="status"

@@ -13,6 +13,7 @@ import (
 	"enterprise-demo/backend/internal/database"
 	apphttp "enterprise-demo/backend/internal/http"
 	"enterprise-demo/backend/internal/logger"
+	"enterprise-demo/backend/internal/modules/scheduler"
 )
 
 func main() {
@@ -37,6 +38,11 @@ func main() {
 		log.Error("database seed failed", "error", err)
 		os.Exit(1)
 	}
+
+	// Start scheduler engine (real background execution)
+	schedEngine := scheduler.NewEngine(db, log)
+	schedEngine.Start()
+	defer schedEngine.Stop()
 
 	server := apphttp.NewServer(cfg, log, db)
 

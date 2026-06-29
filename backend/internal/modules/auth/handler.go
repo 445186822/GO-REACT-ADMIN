@@ -31,6 +31,7 @@ func (h *Handler) Register(g *echo.Group) {
 	g.POST("/auth/login", h.Login)
 	g.POST("/auth/refresh", h.Refresh)
 	g.GET("/auth/me", h.Me, middleware.Auth(h.jwtSecret))
+	g.PUT("/auth/password", h.ChangePassword, middleware.Auth(h.jwtSecret))
 }
 
 type LoginRequest struct {
@@ -49,8 +50,14 @@ type CurrentUser struct {
 	ID          int64      `json:"id"`
 	Username    string     `json:"username"`
 	DisplayName string     `json:"display_name"`
+	Roles       []string   `json:"roles"`
 	Permissions []string   `json:"permissions"`
 	Menus       []MenuNode `json:"menus"`
+}
+
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
 }
 
 type MenuNode struct {
@@ -227,6 +234,44 @@ func (h *Handler) Me(c echo.Context) error {
 	return response.OK(c, user)
 }
 
+func (h *Handler) ChangePassword(c echo.Context) error {
+	userID := middleware.CurrentUserID(c)
+	var req ChangePasswordRequest
+	if err := c.Bind(&req); err != nil {
+		return err
+	}
+
+	if req.OldPassword == "" || len(req.NewPassword) < 6 {
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "old_password is required and new_password must be at least 6 characters")
+	}
+
+	var passwordHash string
+	if err := h.db.QueryRow(c.Request().Context(), `
+SELECT password_hash
+FROM sys_users
+WHERE id = $1 AND deleted_at IS NULL AND status = 'ACTIVE'`, userID).Scan(&passwordHash); err != nil {
+		if err == pgx.ErrNoRows {
+			return response.NewError(http.StatusUnauthorized, "AUTH_USER_NOT_FOUND", "user not found")
+		}
+		return err
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.OldPassword)); err != nil {
+		return response.NewError(http.StatusBadRequest, "AUTH_PASSWORD_INVALID", "current password is incorrect")
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	if _, err := h.db.Exec(c.Request().Context(), `
+UPDATE sys_users
+SET password_hash = $2, updated_at = now()
+WHERE id = $1 AND deleted_at IS NULL`, userID, string(hash)); err != nil {
+		return err
+	}
+	return response.OK(c, map[string]bool{"changed": true})
+}
+
 func (h *Handler) currentUser(c echo.Context, userID int64) (CurrentUser, error) {
 	var user CurrentUser
 	if err := h.db.QueryRow(c.Request().Context(), `
@@ -235,6 +280,31 @@ FROM sys_users
 WHERE id = $1 AND deleted_at IS NULL`, userID).Scan(&user.ID, &user.Username, &user.DisplayName); err != nil {
 		return user, response.NewError(http.StatusUnauthorized, "AUTH_USER_NOT_FOUND", "user not found")
 	}
+
+	roleRows, err := h.db.Query(c.Request().Context(), `
+SELECT r.name
+FROM sys_roles r
+JOIN sys_user_roles ur ON ur.role_id = r.id
+WHERE ur.user_id = $1
+  AND r.deleted_at IS NULL
+  AND r.status = 'ACTIVE'
+ORDER BY r.id`, userID)
+	if err != nil {
+		return user, err
+	}
+	for roleRows.Next() {
+		var role string
+		if err := roleRows.Scan(&role); err != nil {
+			roleRows.Close()
+			return user, err
+		}
+		user.Roles = append(user.Roles, role)
+	}
+	if err := roleRows.Err(); err != nil {
+		roleRows.Close()
+		return user, err
+	}
+	roleRows.Close()
 
 	rows, err := h.db.Query(c.Request().Context(), `
 SELECT DISTINCT m.id, m.parent_id, m.type, m.code, m.name, m.path, m.icon, m.sort_order

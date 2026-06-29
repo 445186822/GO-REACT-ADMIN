@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
+import { formatApiTimes } from './timeFormat';
 
 export const http = axios.create({
   baseURL: '/api/v1',
@@ -15,7 +16,7 @@ http.interceptors.request.use((config) => {
 });
 
 http.interceptors.response.use(
-  (response) => response.data,
+  (response) => formatApiTimes(response.data),
   (error) => {
     if (error.response?.status === 401) {
       useAuthStore.getState().clearSession();

@@ -1,12 +1,14 @@
 import { DeleteOutlined, EyeOutlined, UploadOutlined } from '@ant-design/icons';
 import { ProColumns, ProTable, type ActionType } from '@ant-design/pro-components';
-import { App, Button, Image, Modal, Space, Tag, Typography, Upload, message } from 'antd';
+import { App, Button, Image, Modal, Space, Tag, Typography, Upload } from 'antd';
+import { message } from '../../../utils/message';
 import { useRef, useState } from 'react';
 import { deleteFile, downloadFile, listFiles, uploadFile, type FileRow } from '../../../api/files';
 import { Permission } from '../../../components/Permission';
 import { BackendDownloadButton } from '../../../components/BackendDownloadButton';
 import { ExportButton } from '../../../components/ExportButton';
 import { exportExcel } from '../../../utils/exportExcel';
+import { operationColumnProps } from '../../../utils/tableColumns';
 
 export function FileCenterPage() {
   const { modal } = App.useApp();
@@ -32,10 +34,9 @@ export function FileCenterPage() {
     { title: '创建时间', dataIndex: 'created_at', valueType: 'dateTime', search: false },
     {
       title: '操作',
-      valueType: 'option',
-      width: 240,
+      ...operationColumnProps<FileRow>(260),
       render: (_, row) => (
-        <Space>
+        <Space wrap={false} className="table-action-buttons">
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setPreviewFile(row)}>
             预览
           </Button>
@@ -118,6 +119,7 @@ export function FileCenterPage() {
           return { data: data.items, total: data.total, success: true };
         }}
         pagination={{ defaultPageSize: 10, showSizeChanger: false }}
+        scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           <ExportButton key="export" onClick={exportFiles}>
             导出 Excel

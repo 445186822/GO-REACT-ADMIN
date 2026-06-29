@@ -75,7 +75,11 @@ func PermissionForRequest(method string, rawPath string) string {
 	case path == "/users/:id":
 		return permissionByMethod(method, "", "", "user:update", "user:delete")
 	case path == "/roles":
-		return "role:view"
+		return permissionByMethod(method, "role:view", "role:create", "role:update", "")
+	case path == "/roles/:id":
+		return permissionByMethod(method, "role:view", "", "role:update", "role:delete")
+	case strings.HasPrefix(path, "/roles/") && strings.HasSuffix(path, "/menus"):
+		return permissionByMethod(method, "role:view", "role:update", "role:update", "role:update")
 	case path == "/menus":
 		return "menu:view"
 	case path == "/departments":
@@ -144,6 +148,8 @@ func PermissionForRequest(method string, rawPath string) string {
 		return "ai:chat"
 	case strings.HasPrefix(path, "/ai-assistant/chat"), strings.HasPrefix(path, "/ai/chat"):
 		return "ai:send"
+	case strings.HasPrefix(path, "/chat"):
+		return "chat:view"
 	default:
 		return ""
 	}

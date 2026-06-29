@@ -15,6 +15,7 @@ import {
   FileSearchOutlined,
   FolderOpenOutlined,
   FolderOutlined,
+  LockOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuOutlined,
@@ -28,24 +29,39 @@ import {
   ShoppingCartOutlined,
   TeamOutlined,
   UserOutlined,
+  WechatOutlined,
 } from '@ant-design/icons';
-import { Avatar, Badge, Breadcrumb, Button, ColorPicker, Divider, Drawer, Dropdown, Layout, Menu, Segmented, Select, Slider, Space, Switch, Tabs, Typography } from 'antd';
+import { Avatar, Badge, Breadcrumb, Button, ColorPicker, Divider, Drawer, Dropdown, Empty, Form, Input, Layout, Menu, Modal, Popover, Segmented, Select, Slider, Space, Spin, Switch, Tabs, Typography } from 'antd';
 import { useEffect, useMemo, useState, type ReactNode, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { unreadNotificationCount } from '../api/collaboration';
+import { changePasswordApi } from '../api/auth';
+import { listNotifications, markAllNotificationsRead, markNotificationRead, unreadNotificationCount, type NotificationRow } from '../api/collaboration';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { FloatingAIAssistant } from '../components/FloatingAIAssistant';
 import { useNotificationWebSocket } from '../hooks/useNotificationWebSocket';
 import { useAppearanceStore, type ContentPadding, type Density, type HeaderStyle, type LayoutMode, type PageTone, type SidebarTheme, type TabStyle } from '../store/appearanceStore';
 import { type MenuNode, useAuthStore } from '../store/authStore';
+import { message } from '../utils/message';
 
 const { Header, Sider, Content } = Layout;
+
+type ChangePasswordForm = {
+  old_password: string;
+  new_password: string;
+  confirm_password: string;
+};
 
 export function BasicLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [openKeys, setOpenKeys] = useState<string[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [recentNotifications, setRecentNotifications] = useState<NotificationRow[]>([]);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationLoading, setNotificationLoading] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+  const [passwordForm] = Form.useForm<ChangePasswordForm>();
   const navigate = useNavigate();
   const location = useLocation();
   const clearSession = useAuthStore((state) => state.clearSession);
@@ -66,6 +82,8 @@ export function BasicLayout() {
   const menuItems = useMemo(() => menus.map(toMenuItem), [menus]);
   const pageTitle = currentTrail.at(-1)?.name ?? 'Workspace';
   const breadcrumbItems = [{ title: 'Home' }, ...currentTrail.map((item) => ({ title: item.name }))];
+  const userDisplayName = user?.display_name || user?.username || '';
+  const userRoleText = useMemo(() => (user?.roles ?? []).filter(Boolean).join('、'), [user?.roles]);
 
   // Tab bar state
   interface TabItem { key: string; label: string; path: string }
@@ -219,9 +237,26 @@ export function BasicLayout() {
     }
   }, [activeMenu.openKeys, collapsed]);
 
-  useEffect(() => {
-    void unreadNotificationCount().then(setUnreadCount).catch(() => setUnreadCount(0));
+  const refreshNotificationSummary = useCallback(async () => {
+    setNotificationLoading(true);
+    try {
+      const [count, page] = await Promise.all([
+        unreadNotificationCount(),
+        listNotifications({ page: 1, page_size: 5 }),
+      ]);
+      setUnreadCount(count);
+      setRecentNotifications(page.items);
+    } catch {
+      setUnreadCount(0);
+      setRecentNotifications([]);
+    } finally {
+      setNotificationLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void refreshNotificationSummary();
+  }, [refreshNotificationSummary]);
 
   // Shared WebSocket for notification badge
   const { onMessage: onWsMessage } = useNotificationWebSocket();
@@ -231,10 +266,107 @@ export function BasicLayout() {
         setUnreadCount(data.count ?? 0);
       }
       if (data.event === 'notifications_changed') {
-        void unreadNotificationCount().then(setUnreadCount).catch(() => setUnreadCount(0));
+        void refreshNotificationSummary();
       }
     });
-  }, [onWsMessage]);
+  }, [onWsMessage, refreshNotificationSummary]);
+
+  const openNotificationCenter = () => {
+    setNotificationOpen(false);
+    navigate('/collaboration/notifications');
+  };
+
+  const handleNotificationOpenChange = (open: boolean) => {
+    setNotificationOpen(open);
+    if (open) {
+      void refreshNotificationSummary();
+    }
+  };
+
+  const handleNotificationClick = async (row: NotificationRow) => {
+    if (!row.read_at) {
+      await markNotificationRead(row.id);
+      await refreshNotificationSummary();
+    }
+    openNotificationCenter();
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    await markAllNotificationsRead();
+    setUnreadCount(0);
+    setRecentNotifications((items) => items.map((item) => ({ ...item, read_at: item.read_at ?? '已读' })));
+    message.success('已全部标记为已读');
+  };
+
+  const handleUserMenuClick = ({ key }: { key: string }) => {
+    if (key === 'password') {
+      setPasswordOpen(true);
+      return;
+    }
+    if (key === 'logout') {
+      clearSession();
+      navigate('/login');
+    }
+  };
+
+  const handleChangePassword = async () => {
+    const values = await passwordForm.validateFields();
+    setPasswordSubmitting(true);
+    try {
+      await changePasswordApi({
+        old_password: values.old_password,
+        new_password: values.new_password,
+      });
+      message.success('密码已修改，请重新登录');
+      setPasswordOpen(false);
+      passwordForm.resetFields();
+      clearSession();
+      navigate('/login');
+    } finally {
+      setPasswordSubmitting(false);
+    }
+  };
+
+  const notificationPanel = (
+    <div className="notification-popover">
+      <div className="notification-popover-header">
+        <Typography.Text strong>实时消息</Typography.Text>
+        <Badge count={unreadCount} overflowCount={99} size="small" />
+      </div>
+      <Spin spinning={notificationLoading}>
+        <div className="notification-popover-list">
+          {recentNotifications.length === 0 ? (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无消息" />
+          ) : (
+            recentNotifications.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`notification-popover-item${item.read_at ? '' : ' notification-popover-item-unread'}`}
+                onClick={() => void handleNotificationClick(item)}
+              >
+                <span className="notification-popover-dot" />
+                <span className="notification-popover-main">
+                  <span className="notification-popover-title">{item.title}</span>
+                  <span className="notification-popover-meta">
+                    {item.source_module || item.notif_type} · {item.created_at}
+                  </span>
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </Spin>
+      <div className="notification-popover-footer">
+        <Button type="link" size="small" disabled={unreadCount === 0} onClick={() => void handleMarkAllNotificationsRead()}>
+          全部已读
+        </Button>
+        <Button type="link" size="small" onClick={openNotificationCenter}>
+          查看全部
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <Layout className={`app-shell app-shell-${layoutMode}`}>
@@ -306,14 +438,18 @@ export function BasicLayout() {
                 onSelect={(path) => navigate(path)}
               />
             )}
-            <Badge count={unreadCount} overflowCount={99} size="small">
-              <Button
-                type="text"
-                icon={<BellOutlined />}
-                aria-label="Notifications"
-                onClick={() => navigate('/collaboration/notifications')}
-              />
-            </Badge>
+            <Popover
+              trigger="click"
+              placement="bottomRight"
+              open={notificationOpen}
+              onOpenChange={handleNotificationOpenChange}
+              content={notificationPanel}
+              arrow={false}
+            >
+              <Badge count={unreadCount} overflowCount={99} size="small">
+                <Button type="text" icon={<BellOutlined />} aria-label="实时消息" />
+              </Badge>
+            </Popover>
             <Button
               type="text"
               icon={<ControlOutlined />}
@@ -321,17 +457,23 @@ export function BasicLayout() {
               onClick={() => setAppearanceOpen(true)}
             />
             <Dropdown
+              trigger={['click']}
+              placement="bottomRight"
               menu={{
-                items: [{ key: 'logout', icon: <LogoutOutlined />, label: '退出登录' }],
-                onClick: () => {
-                  clearSession();
-                  navigate('/login');
-                },
+                items: [
+                  { key: 'password', icon: <LockOutlined />, label: <span className="header-dropdown-item">修改密码</span> },
+                  { type: 'divider' },
+                  { key: 'logout', icon: <LogoutOutlined />, label: <span className="header-dropdown-item">退出登录</span> },
+                ],
+                onClick: handleUserMenuClick,
               }}
             >
               <Space className="user-menu">
                 <Avatar size="small" icon={<UserOutlined />} />
-                <Typography.Text>{user?.display_name ?? user?.username ?? ''}</Typography.Text>
+                <Typography.Text className="user-menu-name">
+                  <span className="user-menu-display">{userDisplayName}</span>
+                  {userRoleText && <span className="user-menu-role">（{userRoleText}）</span>}
+                </Typography.Text>
               </Space>
             </Dropdown>
           </div>
@@ -395,6 +537,57 @@ export function BasicLayout() {
               <Outlet key={`${location.pathname}:${pageRefreshKey}`} />
             </ErrorBoundary>
           </div>
+          <Modal
+            title="修改密码"
+            open={passwordOpen}
+            okText="保存"
+            cancelText="取消"
+            confirmLoading={passwordSubmitting}
+            onOk={handleChangePassword}
+            onCancel={() => {
+              setPasswordOpen(false);
+              passwordForm.resetFields();
+            }}
+            destroyOnHidden
+          >
+            <Form form={passwordForm} layout="vertical" requiredMark={false}>
+              <Form.Item
+                name="old_password"
+                label="当前密码"
+                rules={[{ required: true, message: '请输入当前密码' }]}
+              >
+                <Input.Password autoComplete="current-password" />
+              </Form.Item>
+              <Form.Item
+                name="new_password"
+                label="新密码"
+                rules={[
+                  { required: true, message: '请输入新密码' },
+                  { min: 6, message: '新密码至少 6 位' },
+                ]}
+              >
+                <Input.Password autoComplete="new-password" />
+              </Form.Item>
+              <Form.Item
+                name="confirm_password"
+                label="确认新密码"
+                dependencies={['new_password']}
+                rules={[
+                  { required: true, message: '请再次输入新密码' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!value || getFieldValue('new_password') === value) {
+                        return Promise.resolve();
+                      }
+                      return Promise.reject(new Error('两次输入的新密码不一致'));
+                    },
+                  }),
+                ]}
+              >
+                <Input.Password autoComplete="new-password" />
+              </Form.Item>
+            </Form>
+          </Modal>
           <AppearanceDrawer open={appearanceOpen} onClose={() => setAppearanceOpen(false)} />
           <FloatingAIAssistant />
         </Content>
@@ -589,6 +782,7 @@ const iconMap: Record<string, ReactNode> = {
   ShoppingCartOutlined: <ShoppingCartOutlined />,
   TeamOutlined: <TeamOutlined />,
   UserOutlined: <UserOutlined />,
+  WechatOutlined: <WechatOutlined />,
 };
 
 function toMenuItem(menu: MenuNode): any {

@@ -85,21 +85,32 @@ type NotificationRequest struct {
 }
 
 type TodoRow struct {
-	ID              int64     `json:"id"`
-	SourceModule    string    `json:"source_module"`
-	SourceID        int64     `json:"source_id"`
-	Title           string    `json:"title"`
-	BizType         string    `json:"biz_type"`
-	BizID           *string   `json:"biz_id"`
-	Applicant       string    `json:"applicant"`
-	CurrentStep     int       `json:"current_step"`
-	CurrentStepName string    `json:"current_step_name"`
-	Assignee        string    `json:"assignee"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID              int64      `json:"id"`
+	SourceModule    string     `json:"source_module"`
+	SourceID        int64      `json:"source_id"`
+	Title           string     `json:"title"`
+	BizType         string     `json:"biz_type"`
+	BizID           *string    `json:"biz_id"`
+	Applicant       string     `json:"applicant"`
+	CurrentStep     int        `json:"current_step"`
+	CurrentStepName string     `json:"current_step_name"`
+	Assignee        string     `json:"assignee"`
+	CreatedAt       time.Time  `json:"created_at"`
+	TodoStatus      string     `json:"todo_status"`
+	ApprovalStatus  string     `json:"approval_status,omitempty"`
+	Action          *string    `json:"action,omitempty"`
+	ActionAt        *time.Time `json:"action_at,omitempty"`
 }
 
 func (h *Handler) ListTodos(c echo.Context) error {
 	userID := middleware.CurrentUserID(c)
+	if c.QueryParam("scope") == "done" {
+		items, err := h.listDoneTodos(c.Request().Context(), userID)
+		if err != nil {
+			return err
+		}
+		return response.OK(c, items)
+	}
 	roles, err := h.currentUserRoleLabels(c.Request().Context(), userID)
 	if err != nil {
 		return err
@@ -151,12 +162,76 @@ ORDER BY ai.created_at DESC`)
 			CurrentStepName: step.Name,
 			Assignee:        step.Assignee,
 			CreatedAt:       createdAt,
+			TodoStatus:      "pending",
+			ApprovalStatus:  "PENDING",
 		})
 	}
 	if err := rows.Err(); err != nil {
 		return err
 	}
 	return response.OK(c, items)
+}
+
+func (h *Handler) listDoneTodos(ctx context.Context, userID int64) ([]TodoRow, error) {
+	rows, err := h.db.Query(ctx, `
+SELECT aa.id, ai.id, ai.title, ai.biz_type, ai.biz_id, u.display_name, ai.current_step, ai.status,
+       aa.step_index, aa.action, aa.created_at, wd.definition
+FROM approval_actions aa
+JOIN approval_instances ai ON ai.id = aa.instance_id AND ai.deleted_at IS NULL
+JOIN sys_users u ON u.id = ai.applicant_id
+JOIN workflow_definitions wd ON wd.id = ai.workflow_definition_id AND wd.deleted_at IS NULL
+WHERE aa.approver_id = $1
+ORDER BY aa.created_at DESC, aa.id DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]TodoRow, 0)
+	for rows.Next() {
+		var (
+			actionID       int64
+			instanceID     int64
+			title          string
+			bizType        string
+			bizID          *string
+			applicant      string
+			currentStep    int
+			approvalStatus string
+			stepIndex      int
+			action         string
+			actionAt       time.Time
+			definition     json.RawMessage
+		)
+		if err := rows.Scan(&actionID, &instanceID, &title, &bizType, &bizID, &applicant, &currentStep, &approvalStatus, &stepIndex, &action, &actionAt, &definition); err != nil {
+			return nil, err
+		}
+		runtimeSteps := approvalRuntimeSteps(definition)
+		stepName := "第 " + strconv.Itoa(stepIndex+1) + " 步"
+		assignee := ""
+		if stepIndex >= 0 && stepIndex < len(runtimeSteps) {
+			stepName = runtimeSteps[stepIndex].Name
+			assignee = runtimeSteps[stepIndex].Assignee
+		}
+		items = append(items, TodoRow{
+			ID:              actionID,
+			SourceModule:    "approval",
+			SourceID:        instanceID,
+			Title:           title,
+			BizType:         bizType,
+			BizID:           bizID,
+			Applicant:       applicant,
+			CurrentStep:     currentStep,
+			CurrentStepName: stepName,
+			Assignee:        assignee,
+			CreatedAt:       actionAt,
+			TodoStatus:      "done",
+			ApprovalStatus:  approvalStatus,
+			Action:          &action,
+			ActionAt:        &actionAt,
+		})
+	}
+	return items, rows.Err()
 }
 
 func (h *Handler) ListNotifications(c echo.Context) error {
@@ -200,7 +275,7 @@ func (h *Handler) CreateNotification(c echo.Context) error {
 		return err
 	}
 	if req.Title == "" || req.Content == "" {
-		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "title and content are required")
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "标题和内容不能为空")
 	}
 	if req.NotifType == "" {
 		req.NotifType = "system"
@@ -299,7 +374,7 @@ func (h *Handler) CreateMessageTemplate(c echo.Context) error {
 		return err
 	}
 	if req.Code == "" || req.Name == "" || req.Subject == "" {
-		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "code, name and subject are required")
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "编码、名称和标题不能为空")
 	}
 	if req.Category == "" {
 		req.Category = "system_notice"
@@ -403,10 +478,10 @@ func (h *Handler) SubmitApproval(c echo.Context) error {
 		return err
 	}
 	if req.Title == "" {
-		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "title is required")
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "标题不能为空")
 	}
 	if req.WorkflowID == 0 {
-		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "workflow_definition_id is required")
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "请选择审批工作流")
 	}
 	tx, err := h.db.Begin(c.Request().Context())
 	if err != nil {
@@ -449,7 +524,7 @@ WHERE ai.id=$1 AND ai.deleted_at IS NULL`, id)
 	var item ApprovalInstanceRow
 	if err := row.Scan(&item.ID, &item.WorkflowID, &item.Workflow, &item.Title, &item.BizType, &item.BizID, &item.applicantID, &item.Applicant, &item.Status, &item.CurrentStep, &item.FormData, &item.CreatedAt); err != nil {
 		if err == pgx.ErrNoRows {
-			return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "approval instance not found")
+			return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "审批实例不存在")
 		}
 		return err
 	}
@@ -476,7 +551,7 @@ func (h *Handler) ActionApproval(c echo.Context) error {
 		return err
 	}
 	if req.Action != "APPROVE" && req.Action != "REJECT" {
-		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "action must be APPROVE or REJECT")
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "操作只能是审批通过或驳回")
 	}
 	tx, err := h.db.Begin(c.Request().Context())
 	if err != nil {
@@ -492,7 +567,7 @@ func (h *Handler) ActionApproval(c echo.Context) error {
 		return err
 	}
 	if currentStatus != "PENDING" {
-		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "approval is not pending")
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "该审批已处理，不能重复操作")
 	}
 	runtimeSteps, workflowDefinition, hasNotificationNode, err := loadApprovalRuntime(c.Request().Context(), tx, workflowID)
 	if err != nil {
@@ -505,7 +580,7 @@ func (h *Handler) ActionApproval(c echo.Context) error {
 			return err
 		}
 		if !assigneeMatchesRoles(step.Assignee, roles) {
-			return response.NewError(http.StatusForbidden, "APPROVAL_ASSIGNEE_MISMATCH", "current approval step requires role: "+step.Assignee)
+			return response.NewError(http.StatusForbidden, "APPROVAL_ASSIGNEE_MISMATCH", "当前审批节点需要角色: "+step.Assignee+"，您的角色不匹配")
 		}
 	}
 	nextStatus := "REJECTED"
@@ -549,7 +624,7 @@ SELECT id, category
 FROM workflow_definitions
 WHERE id=$1 AND deleted_at IS NULL AND status='ACTIVE' AND category='approval'`, workflowID).Scan(&item.ID, &item.Category)
 	if err == pgx.ErrNoRows {
-		return item, response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "approval workflow is not available")
+		return item, response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "审批工作流不可用")
 	}
 	return item, err
 }
@@ -745,7 +820,7 @@ func (h *Handler) CreateWorkflow(c echo.Context) error {
 		return err
 	}
 	if req.Name == "" {
-		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "name is required")
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "名称不能为空")
 	}
 	if req.Category == "" {
 		req.Category = "general"
@@ -810,7 +885,7 @@ func (h *Handler) RunWorkflow(c echo.Context) error {
 	if err := tx.QueryRow(c.Request().Context(), `
 SELECT definition FROM workflow_definitions WHERE id=$1 AND deleted_at IS NULL`, id).Scan(&definition); err != nil {
 		if err == pgx.ErrNoRows {
-			return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "workflow definition not found")
+			return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "工作流不存在")
 		}
 		return err
 	}
@@ -932,11 +1007,11 @@ func (h *Handler) ChatAI(c echo.Context) error {
 		return err
 	}
 	if req.Message == "" {
-		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "message is required")
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "消息内容不能为空")
 	}
 	endpoint := os.Getenv("AI_ASSISTANT_ENDPOINT")
 	if endpoint == "" {
-		return response.NewError(http.StatusServiceUnavailable, "AI_NOT_CONFIGURED", "AI_ASSISTANT_ENDPOINT is not configured")
+		return response.NewError(http.StatusServiceUnavailable, "AI_NOT_CONFIGURED", "AI 服务未配置，请设置 AI_ASSISTANT_ENDPOINT")
 	}
 	userID := middleware.CurrentUserID(c)
 	if _, err := h.db.Exec(c.Request().Context(), `INSERT INTO ai_assistant_messages (user_id, role, content) VALUES ($1,'user',$2)`, userID, req.Message); err != nil {
@@ -981,7 +1056,7 @@ func callAIEndpoint(ctx context.Context, endpoint string, apiKey string, message
 		return "", err
 	}
 	if parsed.Reply == "" {
-		return "", response.NewError(http.StatusBadGateway, "AI_PROVIDER_ERROR", "AI provider response must include reply")
+		return "", response.NewError(http.StatusBadGateway, "AI_PROVIDER_ERROR", "AI 提供方响应格式错误，缺少 reply 字段")
 	}
 	return parsed.Reply, nil
 }
@@ -990,7 +1065,7 @@ func (h *Handler) NotificationWS(c echo.Context) error {
 	token := c.QueryParam("token")
 	claims, err := auth.Parse(h.jwtSecret, token)
 	if err != nil {
-		return response.NewError(http.StatusUnauthorized, "AUTH_INVALID_TOKEN", "invalid token")
+		return response.NewError(http.StatusUnauthorized, "AUTH_INVALID_TOKEN", "登录已过期，请重新登录")
 	}
 	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
@@ -1091,7 +1166,7 @@ func (h *notificationHub) BroadcastAll(payload any) {
 func parseID(c echo.Context) (int64, error) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		return 0, response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "invalid id")
+		return 0, response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "ID 格式错误")
 	}
 	return id, nil
 }
@@ -1126,7 +1201,7 @@ func safeTableName(name string) bool {
 
 func softDelete(c echo.Context, db *pgxpool.Pool, table string) error {
 	if !safeTableName(table) {
-		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "invalid table name")
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "表名不合法")
 	}
 	id, err := parseID(c)
 	if err != nil {

@@ -28,11 +28,20 @@ export async function uploadFile(file: File): Promise<{ id: number }> {
 }
 
 export async function downloadFile(row: FileRow): Promise<void> {
-  const blob = await http.get<unknown, Blob>(`/files/${row.id}/download`, { responseType: 'blob' });
+  await downloadFileById(row.id, row.original_name);
+}
+
+export async function createFileObjectUrl(id: number): Promise<string> {
+  const blob = await http.get<unknown, Blob>(`/files/${id}/download`, { responseType: 'blob' });
+  return URL.createObjectURL(blob);
+}
+
+export async function downloadFileById(id: number, fileName: string): Promise<void> {
+  const blob = await http.get<unknown, Blob>(`/files/${id}/download`, { responseType: 'blob' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = row.original_name;
+  anchor.download = fileName;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();

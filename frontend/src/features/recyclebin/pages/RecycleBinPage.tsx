@@ -1,6 +1,7 @@
 import { DeleteOutlined, RollbackOutlined, ClearOutlined } from '@ant-design/icons';
 import { ProColumns, ProTable, type ActionType } from '@ant-design/pro-components';
-import { App, Button, Space, Tag, Typography, message } from 'antd';
+import { App, Button, Space, Tag, Typography } from 'antd';
+import { message } from '../../../utils/message';
 import { useRef } from 'react';
 import {
   listRecycled,
@@ -10,6 +11,7 @@ import {
   type RecycledRow,
 } from '../../../api/recycleBin';
 import { Permission } from '../../../components/Permission';
+import { operationColumnProps } from '../../../utils/tableColumns';
 
 const { Text } = Typography;
 
@@ -62,10 +64,9 @@ export function RecycleBinPage() {
     },
     {
       title: '操作',
-      valueType: 'option',
-      width: 160,
+      ...operationColumnProps<RecycledRow>(200),
       render: (_, row) => (
-        <Space>
+        <Space wrap={false} className="table-action-buttons">
           <Permission code="recycle:restore">
             <Button type="link" size="small" icon={<RollbackOutlined />} onClick={() => handleRestore(row)}>
               恢复
@@ -155,6 +156,7 @@ export function RecycleBinPage() {
           </Permission>,
         ]}
         pagination={{ defaultPageSize: 10 }}
+        scroll={{ x: 'max-content' }}
       />
     </div>
   );

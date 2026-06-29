@@ -1,6 +1,7 @@
 import { CheckOutlined, PlusOutlined, WifiOutlined } from '@ant-design/icons';
 import { ModalForm, ProColumns, ProFormSelect, ProFormText, ProFormTextArea, ProTable, type ActionType } from '@ant-design/pro-components';
-import { Badge, Button, Space, Tag, Tooltip, message } from 'antd';
+import { Badge, Button, Space, Tag, Tooltip } from 'antd';
+import { message } from '../../../utils/message';
 import { useEffect, useRef, useState } from 'react';
 import {
   createNotification,
@@ -11,6 +12,7 @@ import {
   type NotificationRow,
 } from '../../../api/collaboration';
 import { useNotificationWebSocket } from '../../../hooks/useNotificationWebSocket';
+import { operationColumnProps } from '../../../utils/tableColumns';
 
 export function NotificationCenterPage() {
   const actionRef = useRef<ActionType>(null);
@@ -51,8 +53,7 @@ export function NotificationCenterPage() {
     { title: '创建时间', dataIndex: 'created_at', valueType: 'dateTime', search: false, width: 180 },
     {
       title: '操作',
-      valueType: 'option',
-      width: 100,
+      ...operationColumnProps<NotificationRow>(120),
       render: (_, row) =>
         row.read_at ? null : (
           <Button
@@ -92,6 +93,7 @@ export function NotificationCenterPage() {
           return { data: page.items, total: page.total, success: true };
         }}
         pagination={{ defaultPageSize: 10 }}
+        scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           <Button
             key="read-all"

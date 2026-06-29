@@ -2,8 +2,8 @@ import { FileExcelOutlined } from '@ant-design/icons';
 import { Button, Tooltip, type ButtonProps } from 'antd';
 import type { ReactNode } from 'react';
 
-const SOURCE_LABEL = '\u524d\u7aef';
-const SOURCE_TIP = '\u524d\u7aef\u751f\u6210\u6587\u4ef6\u5e76\u4e0b\u8f7d';
+const SOURCE_LABEL = '浏览器生成';
+const SOURCE_TIP = '浏览器根据当前接口数据生成 Excel 文件';
 
 type ExportButtonProps = Omit<ButtonProps, 'icon'> & {
   children: ReactNode;

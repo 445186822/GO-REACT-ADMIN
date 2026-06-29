@@ -162,22 +162,63 @@ func (h *Handler) ToggleTask(c echo.Context) error {
 func (h *Handler) RunTask(c echo.Context) error {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "invalid id")
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "ID 格式错误")
 	}
+
+	// Load task
+	var taskType, cronExpr, config string
+	var taskName string
+	err = h.db.QueryRow(c.Request().Context(),
+		`SELECT name, COALESCE(cron_expr, ''), task_type, COALESCE(config::text, '{}') FROM sys_scheduled_tasks WHERE id = $1`, id,
+	).Scan(&taskName, &cronExpr, &taskType, &config)
+	if err != nil {
+		return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "任务不存在")
+	}
+
 	now := time.Now()
 
+	// Insert RUNNING execution record
 	var execID int64
-	h.db.QueryRow(c.Request().Context(),
-		`INSERT INTO sys_task_executions (task_id, status, started_at) VALUES ($1, 'SUCCESS', $2) RETURNING id`, id, now).Scan(&execID)
+	err = h.db.QueryRow(c.Request().Context(),
+		`INSERT INTO sys_task_executions (task_id, status, started_at) VALUES ($1, 'RUNNING', $2) RETURNING id`, id, now).Scan(&execID)
+	if err != nil {
+		return err
+	}
 
-	h.db.Exec(c.Request().Context(),
-		`UPDATE sys_task_executions SET finished_at = $2, output = $3 WHERE id = $1`,
-		execID, now, "Task executed successfully at "+now.Format("2006-01-02 15:04:05"))
+	// Actually execute the task
+	output, execErr := executeTask(c.Request().Context(), h.db, taskType, config)
 
-	h.db.Exec(c.Request().Context(),
-		`UPDATE sys_scheduled_tasks SET last_run_at = $2, updated_at = now() WHERE id = $1`, id, now)
+	finishTime := time.Now()
+	status := "SUCCESS"
+	var errMsg *string
+	if execErr != nil {
+		status = "FAILED"
+		msg := execErr.Error()
+		errMsg = &msg
+	}
 
-	return response.OK(c, map[string]int64{"execution_id": execID})
+	// Update execution record
+	_, err = h.db.Exec(c.Request().Context(),
+		`UPDATE sys_task_executions SET status = $2, finished_at = $3, output = $4, error_message = $5 WHERE id = $1`,
+		execID, status, finishTime, output, errMsg)
+	if err != nil {
+		return err
+	}
+
+	// Update task's last_run_at and next_run_at
+	nextRun := nextCronTime(cronExpr, now)
+	_, _ = h.db.Exec(c.Request().Context(),
+		`UPDATE sys_scheduled_tasks SET last_run_at = $2, next_run_at = $3, updated_at = now() WHERE id = $1`,
+		id, now, nextRun)
+
+	return response.OK(c, map[string]interface{}{
+		"execution_id":  execID,
+		"status":        status,
+		"output":        output,
+		"error_message": errMsg,
+		"last_run_at":   now.Format("2006-01-02 15:04:05"),
+		"next_run_at":   nextRun.Format("2006-01-02 15:04:05"),
+	})
 }
 
 type ExecutionRow struct {

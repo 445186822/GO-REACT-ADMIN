@@ -399,15 +399,142 @@ body {
 }
 
 .user-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
-  max-width: 220px;
+  max-width: 280px;
 }
 
-.user-menu .ant-typography {
-  max-width: 160px;
+.user-menu-name {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 230px;
+  white-space: nowrap;
+}
+
+.user-menu-display,
+.user-menu-role {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.user-menu-display {
+  flex: 0 1 auto;
+  color: #1d2939;
+}
+
+.user-menu-role {
+  flex: 1 1 auto;
+  color: #667085;
+}
+
+.header-dropdown-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 104px;
+  max-width: 220px;
+  white-space: nowrap;
+}
+
+.header-dropdown-item > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notification-popover {
+  width: 340px;
+}
+
+.notification-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px 10px;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.notification-popover-list {
+  min-height: 72px;
+  max-height: 336px;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+
+.notification-popover-item {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  gap: 8px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 6px;
+  cursor: pointer;
+  border: 0;
+  border-radius: 6px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+}
+
+.notification-popover-item:hover {
+  background: #f6f8fb;
+}
+
+.notification-popover-dot {
+  width: 7px;
+  height: 7px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.notification-popover-item-unread .notification-popover-dot {
+  background: #f04438;
+}
+
+.notification-popover-main {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.notification-popover-title {
+  overflow: hidden;
+  color: #1d2939;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notification-popover-item-unread .notification-popover-title {
+  font-weight: 600;
+}
+
+.notification-popover-meta {
+  overflow: hidden;
+  color: #667085;
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notification-popover-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 2px 0;
+  border-top: 1px solid #eef2f6;
 }
 
 .app-loading {
@@ -599,6 +726,20 @@ body {
 
 .settings-value {
   max-width: 360px;
+}
+
+.scheduler-actions .ant-btn-sm {
+  padding-inline: 4px;
+  white-space: nowrap;
+}
+
+.table-action-buttons,
+.table-operation-column {
+  white-space: nowrap;
+}
+
+.table-action-buttons .ant-btn-sm {
+  padding-inline: 4px;
 }
 
 .workflow-designer {

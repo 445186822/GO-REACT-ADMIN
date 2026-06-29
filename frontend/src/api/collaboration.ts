@@ -52,10 +52,19 @@ export type TodoRow = {
   current_step_name: string;
   assignee: string;
   created_at: string;
+  todo_status: 'pending' | 'done';
+  approval_status?: string;
+  action?: 'APPROVE' | 'REJECT';
+  action_at?: string;
 };
 
-export async function listTodos() {
-  const res = await http.get<unknown, { data: TodoRow[] }>('/todos');
+export async function listTodos(params?: { scope?: 'pending' | 'done' }) {
+  const res = await http.get<unknown, { data: TodoRow[] }>('/todos', { params });
+  return res.data;
+}
+
+export async function listDoneTodos() {
+  const res = await http.get<unknown, { data: TodoRow[] }>('/todos', { params: { scope: 'done' } });
   return res.data;
 }
 

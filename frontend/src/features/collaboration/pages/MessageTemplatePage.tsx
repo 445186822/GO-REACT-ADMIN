@@ -1,6 +1,7 @@
 import { DeleteOutlined, EditOutlined, PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import { ModalForm, ProColumns, ProFormSelect, ProFormText, ProFormTextArea, ProTable, type ActionType } from '@ant-design/pro-components';
-import { Button, Input, Popconfirm, Space, Tag, Typography, message } from 'antd';
+import { Button, Input, Popconfirm, Space, Tag, Typography } from 'antd';
+import { message } from '../../../utils/message';
 import { useRef, useState } from 'react';
 import {
   createMessageTemplate,
@@ -10,6 +11,7 @@ import {
   type MessageTemplateRow,
 } from '../../../api/collaboration';
 import { Permission } from '../../../components/Permission';
+import { operationColumnProps } from '../../../utils/tableColumns';
 
 type VariablePair = { key: string; value: string };
 
@@ -43,10 +45,9 @@ export function MessageTemplatePage() {
     { title: '更新时间', dataIndex: 'updated_at', valueType: 'dateTime', search: false, width: 180 },
     {
       title: '操作',
-      valueType: 'option',
-      width: 160,
+      ...operationColumnProps<MessageTemplateRow>(180),
       render: (_, row) => (
-        <Space>
+        <Space wrap={false} className="table-action-buttons">
           <Permission code="message-template:update">
             <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(row)}>
               编辑
@@ -149,6 +150,7 @@ export function MessageTemplatePage() {
           }
         }}
         pagination={{ defaultPageSize: 10 }}
+        scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           <Permission code="message-template:create" key="create">
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setVariables([{ key: '', value: '' }]); setOpen(true); }}>

@@ -60,6 +60,7 @@ import {
   type FAQRow,
 } from '../../../api/knowledgeBase';
 import { Permission } from '../../../components/Permission';
+import { operationColumnProps } from '../../../utils/tableColumns';
 
 const { Text } = Typography;
 
@@ -223,9 +224,9 @@ function ArticlePanel({ actionRef, categoryID, categories, onCountChange }: { ac
     { title: '作者', dataIndex: 'author_name', width: 100, search: false },
     { title: '创建时间', dataIndex: 'created_at', valueType: 'dateTime', width: 160, search: false },
     {
-      title: '操作', valueType: 'option', width: 200,
+      title: '操作', ...operationColumnProps<ArticleRow>(220),
       render: (_, row) => (
-        <Space>
+        <Space wrap={false} className="table-action-buttons">
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => void openView(row.id)}>查看</Button>
           <Permission code="kb:update">
             <Button type="link" size="small" icon={<EditOutlined />} onClick={() => { setEditing(row); setOpen(true); }}>编辑</Button>
@@ -287,6 +288,7 @@ function ArticlePanel({ actionRef, categoryID, categories, onCountChange }: { ac
         }}
         search={{ labelWidth: 'auto', defaultCollapsed: true }}
         pagination={{ defaultPageSize: 10 }}
+        scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           <Permission code="kb:update" key="add">
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setOpen(true); }}>新增文章</Button>
@@ -343,9 +345,9 @@ function FAQPanel({ actionRef, categoryID, categories, onCountChange }: { action
     },
     { title: '排序', dataIndex: 'sort_order', width: 70, search: false },
     {
-      title: '操作', valueType: 'option', width: 150,
+      title: '操作', ...operationColumnProps<FAQRow>(180),
       render: (_, row) => (
-        <Space>
+        <Space wrap={false} className="table-action-buttons">
           <Permission code="kb:update">
             <Button type="link" size="small" icon={<EditOutlined />} onClick={() => { setEditing(row); setOpen(true); }}>编辑</Button>
           </Permission>
@@ -401,6 +403,7 @@ function FAQPanel({ actionRef, categoryID, categories, onCountChange }: { action
         }}
         search={{ labelWidth: 'auto', defaultCollapsed: true }}
         pagination={{ defaultPageSize: 10 }}
+        scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           <Permission code="kb:update" key="add">
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setOpen(true); }}>新增 FAQ</Button>

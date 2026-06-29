@@ -8,7 +8,8 @@ import {
   ProTable,
   type ActionType,
 } from '@ant-design/pro-components';
-import { App, Button, Space, Tag, Tooltip, message } from 'antd';
+import { App, Button, Space, Tag, Tooltip } from 'antd';
+import { message } from '../../../utils/message';
 import { useRef, useState } from 'react';
 import {
   createCustomer,
@@ -21,6 +22,7 @@ import {
 } from '../../../api/customers';
 import { BackendDownloadButton } from '../../../components/BackendDownloadButton';
 import { Permission } from '../../../components/Permission';
+import { operationColumnProps } from '../../../utils/tableColumns';
 
 export function CustomerListPage() {
   const { modal } = App.useApp();
@@ -58,10 +60,9 @@ export function CustomerListPage() {
     },
     {
       title: '操作',
-      valueType: 'option',
-      width: 160,
+      ...operationColumnProps<CustomerRow>(180),
       render: (_, row) => (
-        <Space>
+        <Space wrap={false} className="table-action-buttons">
           <Permission code="customer:update">
             <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(row)}>
               编辑
@@ -132,6 +133,7 @@ export function CustomerListPage() {
           return { data: data.items, total: data.total, success: true };
         }}
         pagination={{ defaultPageSize: 10, showSizeChanger: false }}
+        scroll={{ x: 'max-content' }}
         rowSelection={{
           selectedRowKeys,
           onChange: (keys) => setSelectedRowKeys(keys),

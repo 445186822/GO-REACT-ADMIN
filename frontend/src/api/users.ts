@@ -8,8 +8,7 @@ export type UserRow = {
   phone?: string | null;
   status: 'ACTIVE' | 'DISABLED';
   department?: string | null;
-  role_id?: number | null;
-  role_name?: string | null;
+  roles?: string | null;
 };
 
 export type Page<T> = {

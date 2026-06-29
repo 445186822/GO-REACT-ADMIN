@@ -16,20 +16,8 @@ import {
   ProTable,
   type ActionType,
 } from '@ant-design/pro-components';
-import {
-  App,
-  Button,
-  Card,
-  Col,
-  Row,
-  Space,
-  Tag,
-  Tabs,
-  Tree,
-  Typography,
-  message,
-  type TreeDataNode,
-} from 'antd';
+import { App, Button, Card, Col, Row, Space, Tag, Tabs, Tree, Typography, type TreeDataNode} from 'antd';
+import { message } from '../../../utils/message';
 import { useRef, useState, useEffect } from 'react';
 import {
   createDictType,
@@ -48,6 +36,7 @@ import {
   type DictItemForm,
 } from '../../../api/dataDict';
 import { Permission } from '../../../components/Permission';
+import { operationColumnProps } from '../../../utils/tableColumns';
 
 const { Text } = Typography;
 
@@ -86,10 +75,9 @@ export function DataDictPage() {
     { title: '备注', dataIndex: 'remark', search: false, ellipsis: true },
     {
       title: '操作',
-      valueType: 'option',
-      width: 200,
+      ...operationColumnProps<DictTypeRow>(240),
       render: (_, row) => (
-        <Space>
+        <Space wrap={false} className="table-action-buttons">
           <Button type="link" size="small" onClick={() => selectType(row)}>
             字典项
           </Button>
@@ -172,10 +160,9 @@ export function DataDictPage() {
     { title: '备注', dataIndex: 'remark', ellipsis: true },
     {
       title: '操作',
-      valueType: 'option',
-      width: 140,
+      ...operationColumnProps<DictItemRow>(180),
       render: (_, row) => (
-        <Space>
+        <Space wrap={false} className="table-action-buttons">
           <Permission code="datadict:update">
             <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openItemEdit(row)}>
               编辑
@@ -297,6 +284,7 @@ export function DataDictPage() {
                 search={{ labelWidth: 'auto' }}
                 options={{ reload: true, density: false }}
                 pagination={{ defaultPageSize: 10 }}
+                scroll={{ x: 'max-content' }}
                 onRow={(row) => ({
                   onClick: () => selectType(row),
                   style: {
@@ -346,7 +334,7 @@ export function DataDictPage() {
                 search={false}
                 options={false}
                 pagination={false}
-                scroll={{ y: 400 }}
+                scroll={{ x: 'max-content', y: 400 }}
               />
             </Card>
           </Col>

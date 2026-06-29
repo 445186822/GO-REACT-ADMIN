@@ -16,25 +16,8 @@ import {
   ProTable,
   type ActionType,
 } from '@ant-design/pro-components';
-import {
-  Avatar,
-  Button,
-  Card,
-  Col,
-  Descriptions,
-  Drawer,
-  Input,
-  Modal,
-  Row,
-  Skeleton,
-  Space,
-  Statistic,
-  Steps,
-  Tag,
-  Timeline,
-  Typography,
-  message,
-} from 'antd';
+import { Avatar, Button, Card, Col, Descriptions, Drawer, Input, Modal, Row, Skeleton, Space, Statistic, Steps, Tag, Timeline, Typography} from 'antd';
+import { message, notification } from '../../../utils/message';
 import { useEffect, useRef, useState } from 'react';
 import {
   actionApproval,
@@ -52,6 +35,7 @@ import {
   requiresApprovalComment,
   type ApprovalAction,
 } from '../approvalActions';
+import { operationColumnProps } from '../../../utils/tableColumns';
 
 const { Text, Title } = Typography;
 
@@ -148,10 +132,9 @@ export function ApprovalCenterPage() {
     { title: '提交时间', dataIndex: 'created_at', valueType: 'dateTime', width: 180, search: false },
     {
       title: '操作',
-      valueType: 'option',
-      width: 210,
+      ...operationColumnProps<ApprovalInstanceRow>(240),
       render: (_, row) => (
-        <Space>
+        <Space wrap={false} className="table-action-buttons">
           <Button type="link" size="small" icon={<ExpandOutlined />} onClick={() => openInstanceDetail(row)}>
             详情
           </Button>
@@ -198,7 +181,8 @@ export function ApprovalCenterPage() {
         void getApprovalInstance(actionID).then(setSelectedInstance);
       }
     } catch (err: unknown) {
-      message.error(requestErrorMessage(err, '审批处理失败'));
+      const msg = requestErrorMessage(err, '审批处理失败');
+      notification.error({ message: '审批失败', description: msg, duration: 0 });
     } finally {
       setActionSubmitting(false);
     }
@@ -279,6 +263,7 @@ export function ApprovalCenterPage() {
         }}
         search={{ labelWidth: 'auto', defaultCollapsed: true }}
         options={{ reload: true, density: true }}
+        scroll={{ x: 'max-content' }}
       />
 
       <Drawer

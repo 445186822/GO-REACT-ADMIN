@@ -4,7 +4,7 @@ import type { PointerEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CaptchaChallenge } from '../../api/auth';
 import { getCaptchaChallengeApi, verifyCaptchaApi } from '../../api/auth';
-import { clampSliderX, toTrackPoint, type SliderTrackPoint } from './sliderCaptchaUtils';
+import { clampSliderX, sliderProgressWidth, toTrackPoint, type SliderTrackPoint } from './sliderCaptchaUtils';
 
 type SliderCaptchaProps = {
   enabled: boolean;
@@ -212,7 +212,7 @@ export function SliderCaptcha({ enabled, onVerified }: SliderCaptchaProps) {
           </div>
 
           <div className="slider-captcha-track">
-            <div className="slider-captcha-progress" style={{ width: challenge ? displayOffset + pieceDisplaySize : 0 }} />
+            <div className="slider-captcha-progress" style={{ width: challenge ? sliderProgressWidth(displayOffset, pieceDisplaySize) : 0 }} />
             <button
               aria-label="拖动滑块"
               className="slider-captcha-handle"

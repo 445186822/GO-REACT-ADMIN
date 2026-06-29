@@ -2,12 +2,22 @@ import { App as AntdApp, ConfigProvider, Empty, theme as antdTheme, type ThemeCo
 import zhCN from 'antd/locale/zh_CN';
 import { useEffect, type ReactNode } from 'react';
 import { useAppearanceStore } from '../store/appearanceStore';
+import { initAppApi } from '../utils/message';
 
 const sizeMap = {
   comfortable: 'large',
   middle: 'middle',
   compact: 'small',
 } as const;
+
+/** Inner component — must live inside <AntdApp> so App.useApp() works */
+function MessageInit({ children }: { children: ReactNode }) {
+  const app = AntdApp.useApp();
+  useEffect(() => {
+    initAppApi({ message: app.message, modal: app.modal, notification: app.notification });
+  }, [app]);
+  return <>{children}</>;
+}
 
 export function AppThemeProvider({ children }: { children: ReactNode }) {
   const primaryColor = useAppearanceStore((state) => state.primaryColor);
@@ -77,7 +87,9 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
       renderEmpty={() => <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" />}
     >
       <AntdApp>
-        {children}
+        <MessageInit>
+          {children}
+        </MessageInit>
       </AntdApp>
     </ConfigProvider>
   );

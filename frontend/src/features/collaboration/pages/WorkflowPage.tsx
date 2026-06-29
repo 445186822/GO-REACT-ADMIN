@@ -27,22 +27,8 @@ import {
   ProTable,
   type ActionType,
 } from '@ant-design/pro-components';
-import {
-  App,
-  Button,
-  Card,
-  Drawer,
-  Empty,
-  Form,
-  Input,
-  Select,
-  Space,
-  Tabs,
-  Tag,
-  Tooltip,
-  Typography,
-  message,
-} from 'antd';
+import { App, Button, Card, Drawer, Empty, Form, Input, Select, Space, Tabs, Tag, Tooltip, Typography} from 'antd';
+import { message } from '../../../utils/message';
 import {
   Background,
   BackgroundVariant,
@@ -74,6 +60,7 @@ import {
   type WorkflowRow,
 } from '../../../api/collaboration';
 import { Permission } from '../../../components/Permission';
+import { operationColumnProps } from '../../../utils/tableColumns';
 
 const { Text } = Typography;
 
@@ -173,10 +160,9 @@ export function WorkflowPage() {
     { title: '更新时间', dataIndex: 'updated_at', valueType: 'dateTime', width: 170, search: false },
     {
       title: '操作',
-      valueType: 'option',
-      width: 300,
+      ...operationColumnProps<WorkflowRow>(320),
       render: (_, row) => (
-        <Space>
+        <Space wrap={false} className="table-action-buttons">
           <Permission code="workflow:update">
             <Button type="link" size="small" icon={<ExpandOutlined />} onClick={() => openDesigner(row)}>
               编排
@@ -456,6 +442,7 @@ export function WorkflowPage() {
                 }}
                 search={{ labelWidth: 'auto', defaultCollapsed: true }}
                 options={{ reload: true, density: true }}
+                scroll={{ x: 'max-content' }}
               />
             ),
           },

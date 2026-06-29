@@ -5,6 +5,7 @@ export type CurrentUser = {
   id: number;
   username: string;
   display_name: string;
+  roles?: string[];
   permissions: string[];
   menus: MenuNode[];
 };

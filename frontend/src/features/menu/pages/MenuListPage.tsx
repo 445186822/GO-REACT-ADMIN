@@ -1,5 +1,6 @@
 ﻿import { ProColumns, ProTable } from '@ant-design/pro-components';
-import { Tag, message } from 'antd';
+import { Tag } from 'antd';
+import { message } from '../../../utils/message';
 import { listMenus, type MenuRow } from '../../../api/menus';
 import { ExportButton } from '../../../components/ExportButton';
 import { exportExcel } from '../../../utils/exportExcel';

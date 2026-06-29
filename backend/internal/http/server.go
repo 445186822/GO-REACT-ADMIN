@@ -9,19 +9,20 @@ import (
 	"enterprise-demo/backend/internal/http/response"
 	"enterprise-demo/backend/internal/modules/auditlog"
 	authmodule "enterprise-demo/backend/internal/modules/auth"
+	"enterprise-demo/backend/internal/modules/chat"
 	"enterprise-demo/backend/internal/modules/collaboration"
 	"enterprise-demo/backend/internal/modules/customer"
 	"enterprise-demo/backend/internal/modules/dashboard"
 	"enterprise-demo/backend/internal/modules/datadict"
-	"enterprise-demo/backend/internal/modules/knowledgebase"
-	"enterprise-demo/backend/internal/modules/monitor"
-	"enterprise-demo/backend/internal/modules/recyclebin"
-	"enterprise-demo/backend/internal/modules/scheduler"
 	"enterprise-demo/backend/internal/modules/department"
 	filemodule "enterprise-demo/backend/internal/modules/file"
 	"enterprise-demo/backend/internal/modules/health"
+	"enterprise-demo/backend/internal/modules/knowledgebase"
 	"enterprise-demo/backend/internal/modules/menu"
+	"enterprise-demo/backend/internal/modules/monitor"
+	"enterprise-demo/backend/internal/modules/recyclebin"
 	"enterprise-demo/backend/internal/modules/role"
+	"enterprise-demo/backend/internal/modules/scheduler"
 	"enterprise-demo/backend/internal/modules/settings"
 	"enterprise-demo/backend/internal/modules/user"
 
@@ -60,6 +61,7 @@ func NewServer(cfg config.Config, log *slog.Logger, db *pgxpool.Pool) *echo.Echo
 	filemodule.NewHandler(db, cfg.JWTSecret, cfg.UploadDir).Register(api)
 	auditlog.NewHandler(db, cfg.JWTSecret).Register(api)
 	settings.NewHandler(db, cfg.JWTSecret).Register(api)
+	chat.NewHandler(db, cfg.JWTSecret).Register(api)
 	collaboration.NewHandler(db, cfg.JWTSecret).Register(api)
 	datadict.NewHandler(db, cfg.JWTSecret).Register(api)
 	recyclebin.NewHandler(db, cfg.JWTSecret).Register(api)

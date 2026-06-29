@@ -32,6 +32,15 @@ export type ExecutionRow = {
   error_message?: string | null;
 };
 
+export type RunTaskResult = {
+  execution_id: number;
+  status: string;
+  output?: string | null;
+  error_message?: string | null;
+  last_run_at?: string | null;
+  next_run_at?: string | null;
+};
+
 export async function listTasks(params: { keyword?: string; page?: number; page_size?: number }): Promise<Page<TaskRow>> {
   const res = await http.get<unknown, { data: Page<TaskRow> }>('/scheduler/tasks', { params });
   return res.data;
@@ -57,8 +66,8 @@ export async function toggleTask(id: number): Promise<{ enabled: boolean }> {
   return res.data;
 }
 
-export async function runTask(id: number): Promise<{ execution_id: number }> {
-  const res = await http.post<unknown, { data: { execution_id: number } }>(`/scheduler/tasks/${id}/run`);
+export async function runTask(id: number): Promise<RunTaskResult> {
+  const res = await http.post<unknown, { data: RunTaskResult }>(`/scheduler/tasks/${id}/run`);
   return res.data;
 }
 

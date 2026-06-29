@@ -1,5 +1,5 @@
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, Typography, message } from 'antd';
+import { Alert, Button, Card, Form, Input, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loginApi } from '../../../api/auth';
@@ -20,6 +20,7 @@ export function LoginPage() {
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaVersion, setCaptchaVersion] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [loginError, setLoginError] = useState('');
   const username = Form.useWatch('username', form);
   const password = Form.useWatch('password', form);
   const captchaEnabled = shouldEnableSliderCaptcha(username, password);
@@ -60,10 +61,11 @@ export function LoginPage() {
 
   const handleSubmit = async (values: LoginForm) => {
     if (!captchaToken) {
-      message.warning('请先完成滑块验证');
+      setLoginError('请先完成滑块验证');
       return;
     }
 
+    setLoginError('');
     setSubmitting(true);
     try {
       const data = await loginApi({ ...values, captcha_token: captchaToken });
@@ -73,10 +75,13 @@ export function LoginPage() {
         user: data.user,
       });
       navigate('/dashboard');
-    } catch {
+    } catch (err: unknown) {
       form.setFieldValue('password', '');
       resetCaptcha();
-      message.error('登录失败，用户名或密码错误');
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        '登录失败，请检查用户名或密码';
+      setLoginError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -112,6 +117,18 @@ export function LoginPage() {
             <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
               <Input.Password autoComplete="current-password" prefix={<LockOutlined />} placeholder="密码" />
             </Form.Item>
+
+            {loginError && (
+              <div style={{ marginBottom: 12 }}>
+                <Alert
+                  message={loginError}
+                  type="error"
+                  showIcon
+                  closable
+                  onClose={() => setLoginError('')}
+                />
+              </div>
+            )}
 
             <SliderCaptcha
               key={captchaVersion}

@@ -8,6 +8,10 @@ export function clampSliderX(value: number, trackWidth: number, pieceSize: numbe
   return Math.min(Math.max(Math.round(value), 0), max);
 }
 
+export function sliderProgressWidth(offset: number, _pieceSize: number) {
+  return Math.max(0, Math.round(offset));
+}
+
 export function toTrackPoint(x: number, elapsedMs: number): SliderTrackPoint {
   return {
     x: Math.round(x),

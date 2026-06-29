@@ -34,6 +34,11 @@ export type CaptchaVerifyRequest = {
   track: Array<{ x: number; t: number }>;
 };
 
+export type ChangePasswordRequest = {
+  old_password: string;
+  new_password: string;
+};
+
 export async function loginApi(data: LoginRequest): Promise<LoginResponse> {
   const res = await http.post<unknown, { data: LoginResponse }>('/auth/login', data);
   return res.data;
@@ -51,5 +56,10 @@ export async function verifyCaptchaApi(data: CaptchaVerifyRequest): Promise<{ ca
 
 export async function meApi(): Promise<CurrentUser> {
   const res = await http.get<unknown, { data: CurrentUser }>('/auth/me');
+  return res.data;
+}
+
+export async function changePasswordApi(data: ChangePasswordRequest): Promise<{ changed: boolean }> {
+  const res = await http.put<unknown, { data: { changed: boolean } }>('/auth/password', data);
   return res.data;
 }

@@ -41,7 +41,7 @@ SET name = EXCLUDED.name,
 SELECT setval(pg_get_serial_sequence('sys_users', 'id'), COALESCE((SELECT max(id) FROM sys_users), 1), true);
 
 INSERT INTO sys_users (username, password_hash, display_name, department_id, status)
-SELECT seed.username, '$2a$10$ynV63Fh0TG.N8SUoZbOk5uY3gxyIuxTPISoYJxxEo86VKYhWQnAnC', seed.display_name, NULL, 'ACTIVE'
+SELECT seed.username, '$2a$10$5VtgIFD16Yq0xSjGZcQtxe6Ruifb5bMdlJkv9uWlZPUH42JllsQSW', seed.display_name, NULL, 'ACTIVE'
 FROM (
     VALUES
         ('dept_manager', '部门负责人'),

@@ -9,13 +9,15 @@ import {
   ProTable,
   type ActionType,
 } from '@ant-design/pro-components';
-import { Button, Space, Tabs, Tag, Typography, message } from 'antd';
+import { Button, Space, Tabs, Tag, Typography } from 'antd';
+import { message } from '../../../utils/message';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { listSettings, upsertSetting, type SettingForm, type SettingRow } from '../../../api/settings';
 import { ExportButton } from '../../../components/ExportButton';
 import { Permission } from '../../../components/Permission';
 import { exportExcel } from '../../../utils/exportExcel';
 import { groupSettingsForView, settingValuePreview } from '../settingsView';
+import { operationColumnProps } from '../../../utils/tableColumns';
 
 const { Text } = Typography;
 
@@ -55,8 +57,7 @@ export function SettingsPage() {
     { title: '更新时间', dataIndex: 'updated_at', valueType: 'dateTime', width: 170, search: false },
     {
       title: '操作',
-      valueType: 'option',
-      width: 100,
+      ...operationColumnProps<SettingRow>(120),
       render: (_, row) => (
         <Permission code="settings:update">
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(row)}>
@@ -159,6 +160,7 @@ export function SettingsPage() {
                 search={{ labelWidth: 80 }}
                 options={false}
                 pagination={{ defaultPageSize: 10, showSizeChanger: false }}
+                scroll={{ x: 'max-content' }}
               />
             </>
           ),
