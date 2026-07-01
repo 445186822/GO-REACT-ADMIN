@@ -1,13 +1,12 @@
 import {
   CheckOutlined,
   CloseOutlined,
-  ClockCircleOutlined,
   EyeOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
 import { ProColumns, ProTable, type ActionType } from '@ant-design/pro-components';
-import { Button, Input, Modal, Space, Statistic, Tabs, Tag, Typography } from 'antd';
-import { message, notification } from '../../../utils/message';
+import { Button, Input, Modal, Space, Tabs, Tag, Typography } from 'antd';
+import { message, notification, requestErrorMessage } from '../../../utils/message';
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { actionApproval, listTodos, type TodoRow } from '../../../api/collaboration';
@@ -121,13 +120,6 @@ export function TodoCenterPage() {
 
   return (
     <div style={{ paddingBottom: 24 }}>
-      <Space style={{ marginBottom: 16 }} size={16}>
-        <Statistic title="我的待办" value={counts.pending} prefix={<ClockCircleOutlined />} />
-        <Statistic title="我的已办" value={counts.done} />
-        <Button icon={<ReloadOutlined />} onClick={() => actionRef.current?.reload()}>
-          刷新
-        </Button>
-      </Space>
       <Tabs
         activeKey={activeScope}
         onChange={(key) => {
@@ -143,6 +135,7 @@ export function TodoCenterPage() {
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
+        scroll={{ x: 'max-content' }}
         params={{ activeScope }}
         request={async () => {
           try {
@@ -160,8 +153,12 @@ export function TodoCenterPage() {
           }
         }}
         search={false}
-        scroll={{ x: activeScope === 'pending' ? 1060 : 980 }}
-        options={{ reload: true, density: true }}
+        options={{ reload: false, density: true }}
+        toolBarRender={() => [
+          <Button key="reload" icon={<ReloadOutlined />} onClick={() => actionRef.current?.reload()}>
+            刷新
+          </Button>,
+        ]}
       />
 
       <Modal
@@ -191,7 +188,4 @@ export function TodoCenterPage() {
   );
 }
 
-function requestErrorMessage(err: unknown, fallback: string) {
-  const response = (err as { response?: { data?: { message?: string } } }).response;
-  return response?.data?.message || fallback;
-}
+

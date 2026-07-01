@@ -20,10 +20,12 @@ type workflowDefinitionNode struct {
 }
 
 type workflowDefinitionNodeData struct {
-	Key      string `json:"key"`
-	Name     string `json:"name"`
-	NodeType string `json:"nodeType"`
-	Assignee string `json:"assignee"`
+	Key         string          `json:"key"`
+	Name        string          `json:"name"`
+	NodeType    string          `json:"nodeType"`
+	Assignee    string          `json:"assignee"`
+	Description string          `json:"description"`
+	Config      json.RawMessage `json:"config"`
 }
 
 type workflowDefinitionEdge struct {

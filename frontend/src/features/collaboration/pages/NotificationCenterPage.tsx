@@ -46,10 +46,10 @@ export function NotificationCenterPage() {
       search: false,
       render: (_, row) => <Badge status={row.read_at ? 'default' : 'processing'} text={row.read_at ? '已读' : '未读'} />,
     },
-    { title: '标题', dataIndex: 'title', ellipsis: true },
+    { title: '标题', dataIndex: 'title', ellipsis: true, width: 200 },
     { title: '类型', dataIndex: 'notif_type', width: 120 },
     { title: '来源', dataIndex: 'source_module', width: 120 },
-    { title: '内容', dataIndex: 'content', search: false, ellipsis: true },
+    { title: '内容', dataIndex: 'content', search: false, ellipsis: true, width: 220 },
     { title: '创建时间', dataIndex: 'created_at', valueType: 'dateTime', search: false, width: 180 },
     {
       title: '操作',
@@ -88,12 +88,12 @@ export function NotificationCenterPage() {
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
+        scroll={{ x: 'max-content' }}
         request={async (params) => {
           const page = await listNotifications({ page: params.current, page_size: params.pageSize });
           return { data: page.items, total: page.total, success: true };
         }}
         pagination={{ defaultPageSize: 10 }}
-        scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           <Button
             key="read-all"

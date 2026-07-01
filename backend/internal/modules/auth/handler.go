@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"enterprise-demo/backend/internal/auth"
@@ -47,12 +48,19 @@ type LoginResponse struct {
 }
 
 type CurrentUser struct {
-	ID          int64      `json:"id"`
-	Username    string     `json:"username"`
-	DisplayName string     `json:"display_name"`
-	Roles       []string   `json:"roles"`
-	Permissions []string   `json:"permissions"`
-	Menus       []MenuNode `json:"menus"`
+	ID          int64       `json:"id"`
+	Username    string      `json:"username"`
+	DisplayName string      `json:"display_name"`
+	Roles       []RoleBrief `json:"roles"`
+	ActiveRole  *RoleBrief  `json:"active_role,omitempty"`
+	Permissions []string    `json:"permissions"`
+	Menus       []MenuNode  `json:"menus"`
+}
+
+type RoleBrief struct {
+	ID   int64  `json:"id"`
+	Code string `json:"code"`
+	Name string `json:"name"`
 }
 
 type ChangePasswordRequest struct {
@@ -282,7 +290,7 @@ WHERE id = $1 AND deleted_at IS NULL`, userID).Scan(&user.ID, &user.Username, &u
 	}
 
 	roleRows, err := h.db.Query(c.Request().Context(), `
-SELECT r.name
+SELECT r.id, r.code, r.name
 FROM sys_roles r
 JOIN sys_user_roles ur ON ur.role_id = r.id
 WHERE ur.user_id = $1
@@ -293,8 +301,8 @@ ORDER BY r.id`, userID)
 		return user, err
 	}
 	for roleRows.Next() {
-		var role string
-		if err := roleRows.Scan(&role); err != nil {
+		var role RoleBrief
+		if err := roleRows.Scan(&role.ID, &role.Code, &role.Name); err != nil {
 			roleRows.Close()
 			return user, err
 		}
@@ -306,15 +314,20 @@ ORDER BY r.id`, userID)
 	}
 	roleRows.Close()
 
+	activeRole := selectActiveRole(user.Roles, middleware.ActiveRoleCode(c))
+	if activeRole == nil {
+		return user, nil
+	}
+	user.ActiveRole = activeRole
+
 	rows, err := h.db.Query(c.Request().Context(), `
 SELECT DISTINCT m.id, m.parent_id, m.type, m.code, m.name, m.path, m.icon, m.sort_order
 FROM sys_menus m
 JOIN sys_role_menus rm ON rm.menu_id = m.id
-JOIN sys_user_roles ur ON ur.role_id = rm.role_id
-WHERE ur.user_id = $1
+WHERE rm.role_id = $1
   AND m.deleted_at IS NULL
   AND m.status = 'ACTIVE'
-ORDER BY m.sort_order, m.id`, userID)
+ORDER BY m.sort_order, m.id`, activeRole.ID)
 	if err != nil {
 		return user, err
 	}
@@ -339,6 +352,20 @@ ORDER BY m.sort_order, m.id`, userID)
 	user.Menus = buildTree(flat)
 	sort.Strings(user.Permissions)
 	return user, nil
+}
+
+func selectActiveRole(roles []RoleBrief, requested string) *RoleBrief {
+	if len(roles) == 0 {
+		return nil
+	}
+	if requested != "" {
+		for i := range roles {
+			if strings.EqualFold(roles[i].Code, requested) || strings.EqualFold(roles[i].Name, requested) {
+				return &roles[i]
+			}
+		}
+	}
+	return &roles[0]
 }
 
 func buildTree(flat []MenuNode) []MenuNode {

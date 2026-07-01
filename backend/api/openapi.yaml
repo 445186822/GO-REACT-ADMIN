@@ -34,12 +34,32 @@ paths:
       responses:
         "200":
           description: New access token
+  /auth/captcha:
+    get:
+      security: []
+      summary: Get slider captcha challenge
+      responses:
+        "200":
+          description: Captcha challenge
+  /auth/captcha/verify:
+    post:
+      security: []
+      summary: Verify slider captcha challenge
+      responses:
+        "200":
+          description: Captcha verification token
   /auth/me:
     get:
       summary: Current user, permissions, and menu tree
       responses:
         "200":
           description: Current user
+  /auth/password:
+    put:
+      summary: Change current user's password
+      responses:
+        "200":
+          description: Password changed
   /users:
     get:
       summary: List users
@@ -66,12 +86,55 @@ paths:
       responses:
         "200":
           description: Deleted
+  /users/{id}/reset-password:
+    put:
+      summary: Reset a user's password
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Password reset
   /roles:
     get:
       summary: List roles
       responses:
         "200":
           description: Roles
+    post:
+      summary: Create role
+      responses:
+        "201":
+          description: Created role ID
+  /roles/{id}:
+    put:
+      summary: Update role
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      summary: Soft delete role
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Deleted
+  /roles/{id}/menus:
+    get:
+      summary: List role menu IDs
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Role menu IDs
+    put:
+      summary: Update role menus
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
   /menus:
     get:
       summary: List menus and permissions
@@ -202,6 +265,169 @@ paths:
       responses:
         "200":
           description: Setting ID
+  /dashboard/stats:
+    get:
+      summary: Get dashboard statistics
+      responses:
+        "200":
+          description: Dashboard statistics
+  /monitor/overview:
+    get:
+      summary: Get system monitor overview
+      responses:
+        "200":
+          description: Monitor overview
+  /monitor/db-stats:
+    get:
+      summary: Get database monitor statistics
+      responses:
+        "200":
+          description: Database statistics
+  /dict/types:
+    get:
+      summary: List dictionary types
+      responses:
+        "200":
+          description: Dictionary types
+    post:
+      summary: Create dictionary type
+      responses:
+        "201":
+          description: Created type ID
+  /dict/types/tree:
+    get:
+      summary: Get dictionary type tree
+      responses:
+        "200":
+          description: Dictionary type tree
+  /dict/types/{id}:
+    put:
+      summary: Update dictionary type
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      summary: Delete dictionary type
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Deleted
+  /dict/types/{id}/items:
+    get:
+      summary: List dictionary items
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Dictionary items
+    post:
+      summary: Create dictionary item
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "201":
+          description: Created item ID
+  /dict/items/{id}:
+    put:
+      summary: Update dictionary item
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      summary: Delete dictionary item
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Deleted
+  /dict/items/batch-sort:
+    put:
+      summary: Batch sort dictionary items
+      responses:
+        "200":
+          description: Sorted
+  /recycle-bin:
+    get:
+      summary: List recycled records
+      responses:
+        "200":
+          description: Recycled records
+    delete:
+      summary: Purge all recycled records
+      responses:
+        "200":
+          description: Purged
+  /recycle-bin/{id}:
+    delete:
+      summary: Purge one recycled record
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Purged
+  /recycle-bin/{id}/restore:
+    post:
+      summary: Restore one recycled record
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Restored
+  /scheduler/tasks:
+    get:
+      summary: List scheduler tasks
+      responses:
+        "200":
+          description: Scheduler tasks
+    post:
+      summary: Create scheduler task
+      responses:
+        "201":
+          description: Created task ID
+  /scheduler/tasks/{id}:
+    put:
+      summary: Update scheduler task
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      summary: Delete scheduler task
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Deleted
+  /scheduler/tasks/{id}/toggle:
+    post:
+      summary: Toggle scheduler task
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Task enabled state
+  /scheduler/tasks/{id}/run:
+    post:
+      summary: Run scheduler task immediately
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Run result
+  /scheduler/tasks/{id}/executions:
+    get:
+      summary: List scheduler task executions
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Task executions
   /kb/categories:
     get:
       summary: List knowledge categories
@@ -230,6 +456,12 @@ paths:
           description: Deleted
         "409":
           description: Category has child categories, articles, or FAQs
+  /kb/categories/tree:
+    get:
+      summary: Get knowledge category tree
+      responses:
+        "200":
+          description: Category tree
   /kb/articles:
     get:
       summary: List knowledge articles
@@ -294,6 +526,169 @@ paths:
       responses:
         "201":
           description: Created FAQ ID
+  /kb/faqs/{id}:
+    put:
+      summary: Update knowledge FAQ
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      summary: Soft delete knowledge FAQ
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Deleted
+  /todos:
+    get:
+      summary: List current user's todos
+      responses:
+        "200":
+          description: Todos
+  /notifications:
+    get:
+      summary: List notifications
+      responses:
+        "200":
+          description: Notifications
+    post:
+      summary: Create notification
+      responses:
+        "201":
+          description: Created notification ID
+  /notifications/unread-count:
+    get:
+      summary: Get unread notification count
+      responses:
+        "200":
+          description: Unread count
+  /notifications/{id}/read:
+    put:
+      summary: Mark notification as read
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Marked read
+  /notifications/read-all:
+    put:
+      summary: Mark all notifications as read
+      responses:
+        "200":
+          description: Marked read
+  /notifications/ws:
+    get:
+      summary: Notification websocket endpoint
+      responses:
+        "101":
+          description: WebSocket upgrade
+  /chat/sessions:
+    get:
+      summary: List chat sessions
+      responses:
+        "200":
+          description: Chat sessions
+    post:
+      summary: Create chat session
+      responses:
+        "201":
+          description: Created session ID
+  /chat/sessions/{id}:
+    get:
+      summary: Get chat session detail
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Chat session
+    put:
+      summary: Update chat session
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
+  /chat/sessions/{id}/messages:
+    get:
+      summary: List chat messages
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Chat messages
+    post:
+      summary: Send chat message
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "201":
+          description: Created message
+  /chat/sessions/{id}/messages/{message_id}/revoke:
+    post:
+      summary: Revoke chat message
+      parameters:
+        - $ref: "#/components/parameters/ID"
+        - name: message_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Revoked
+  /chat/sessions/{id}/read:
+    put:
+      summary: Mark chat session as read
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Marked read
+  /chat/sessions/{id}/settings:
+    put:
+      summary: Update chat session settings
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
+  /chat/sessions/{id}/participants:
+    post:
+      summary: Add chat session participants
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Added
+  /chat/sessions/{id}/participants/{user_id}:
+    delete:
+      summary: Remove chat session participant
+      parameters:
+        - $ref: "#/components/parameters/ID"
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Removed
+  /chat/users:
+    get:
+      summary: Search users for chat
+      responses:
+        "200":
+          description: Users
+  /chat/ws:
+    get:
+      summary: Chat websocket endpoint
+      responses:
+        "101":
+          description: WebSocket upgrade
   /message-templates:
     get:
       summary: List message templates with backend filtering
@@ -310,6 +705,26 @@ paths:
       responses:
         "200":
           description: Message templates
+    post:
+      summary: Create message template
+      responses:
+        "201":
+          description: Created template ID
+  /message-templates/{id}:
+    put:
+      summary: Update message template
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      summary: Delete message template
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Deleted
   /approval/instances:
     get:
       summary: List approval instances with backend filtering
@@ -331,6 +746,14 @@ paths:
       responses:
         "201":
           description: Created approval instance ID
+  /approval/instances/{id}:
+    get:
+      summary: Get approval instance detail
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Approval instance
   /approval/instances/{id}/action:
     post:
       summary: Approve or reject an approval instance
@@ -355,6 +778,48 @@ paths:
       responses:
         "200":
           description: Workflows
+    post:
+      summary: Create workflow
+      responses:
+        "201":
+          description: Created workflow ID
+  /workflows/{id}:
+    put:
+      summary: Update workflow
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      summary: Delete workflow
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Deleted
+  /workflows/{id}/run:
+    post:
+      summary: Run workflow
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Workflow run result
+  /workflows/instances:
+    get:
+      summary: List workflow instances
+      responses:
+        "200":
+          description: Workflow instances
+  /workflows/instances/{id}:
+    get:
+      summary: Get workflow instance detail
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Workflow instance
   /ai-assistant/messages:
     get:
       summary: List current user's persisted AI assistant messages
@@ -367,6 +832,18 @@ paths:
       responses:
         "200":
           description: AI assistant reply
+  /ai/chat:
+    post:
+      summary: Stream chat completion from configured AI provider
+      responses:
+        "200":
+          description: Server-sent event stream
+  /ai/history:
+    get:
+      summary: List current user's streaming AI chat history
+      responses:
+        "200":
+          description: AI chat history
 components:
   securitySchemes:
     bearerAuth:

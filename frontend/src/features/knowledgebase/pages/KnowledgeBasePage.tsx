@@ -271,6 +271,7 @@ function ArticlePanel({ actionRef, categoryID, categories, onCountChange }: { ac
     <>
       <ProTable<ArticleRow>
         actionRef={actionRef} rowKey="id" columns={columns}
+        scroll={{ x: 'max-content' }}
         request={async (params) => {
           try {
             const page = await listArticles({
@@ -288,7 +289,6 @@ function ArticlePanel({ actionRef, categoryID, categories, onCountChange }: { ac
         }}
         search={{ labelWidth: 'auto', defaultCollapsed: true }}
         pagination={{ defaultPageSize: 10 }}
-        scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           <Permission code="kb:update" key="add">
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setOpen(true); }}>新增文章</Button>
@@ -328,7 +328,7 @@ function FAQPanel({ actionRef, categoryID, categories, onCountChange }: { action
   const [editing, setEditing] = useState<FAQRow | null>(null);
 
   const columns: ProColumns<FAQRow>[] = [
-    { title: '问题', dataIndex: 'question', ellipsis: true },
+    { title: '问题', dataIndex: 'question', ellipsis: true, width: 150 },
     { title: '答案', dataIndex: 'answer', ellipsis: true, width: 300, search: false },
     {
       title: '分类', dataIndex: 'category_id', width: 110,
@@ -403,7 +403,6 @@ function FAQPanel({ actionRef, categoryID, categories, onCountChange }: { action
         }}
         search={{ labelWidth: 'auto', defaultCollapsed: true }}
         pagination={{ defaultPageSize: 10 }}
-        scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           <Permission code="kb:update" key="add">
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setOpen(true); }}>新增 FAQ</Button>

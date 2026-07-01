@@ -61,8 +61,14 @@ func NewServer(cfg config.Config, log *slog.Logger, db *pgxpool.Pool) *echo.Echo
 	filemodule.NewHandler(db, cfg.JWTSecret, cfg.UploadDir).Register(api)
 	auditlog.NewHandler(db, cfg.JWTSecret).Register(api)
 	settings.NewHandler(db, cfg.JWTSecret).Register(api)
-	chat.NewHandler(db, cfg.JWTSecret).Register(api)
-	collaboration.NewHandler(db, cfg.JWTSecret).Register(api)
+	chat.NewHandler(db, cfg.JWTSecret, cfg.AllowedOrigin).Register(api)
+	collaboration.NewHandler(db, cfg.JWTSecret, cfg.AllowedOrigin, collaboration.AIConfig{
+		AssistantEndpoint: cfg.AIAssistantEndpoint,
+		AssistantAPIKey:   cfg.AIAssistantAPIKey,
+		StreamBaseURL:     cfg.AIStreamBaseURL,
+		StreamAPIKey:      cfg.AIStreamAPIKey,
+		StreamModel:       cfg.AIStreamModel,
+	}).Register(api)
 	datadict.NewHandler(db, cfg.JWTSecret).Register(api)
 	recyclebin.NewHandler(db, cfg.JWTSecret).Register(api)
 	dashboard.NewHandler(db, cfg.JWTSecret).Register(api)

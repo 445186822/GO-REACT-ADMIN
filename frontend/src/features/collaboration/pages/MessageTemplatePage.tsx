@@ -31,10 +31,10 @@ export function MessageTemplatePage() {
   const [variables, setVariables] = useState<VariablePair[]>([{ key: '', value: '' }]);
 
   const columns: ProColumns<MessageTemplateRow>[] = [
-    { title: '编码', dataIndex: 'code', copyable: true },
-    { title: '名称', dataIndex: 'name' },
-    { title: '分类', dataIndex: 'category', width: 150 },
-    { title: '主题', dataIndex: 'subject', search: false, ellipsis: true },
+    { title: '编码', dataIndex: 'code', width: 130, copyable: true },
+    { title: '名称', dataIndex: 'name', width: 180 },
+    { title: '分类', dataIndex: 'category', width: 120 },
+    { title: '主题', dataIndex: 'subject', width: 200, search: false, ellipsis: true },
     {
       title: '状态',
       dataIndex: 'status',
@@ -136,6 +136,7 @@ export function MessageTemplatePage() {
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
+        scroll={{ x: 'max-content' }}
         request={async (params) => {
           try {
             const data = await listMessageTemplates({
@@ -150,7 +151,6 @@ export function MessageTemplatePage() {
           }
         }}
         pagination={{ defaultPageSize: 10 }}
-        scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           <Permission code="message-template:create" key="create">
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setVariables([{ key: '', value: '' }]); setOpen(true); }}>

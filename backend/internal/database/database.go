@@ -44,6 +44,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, migrationsDir string) erro
 		return err
 	}
 	sort.Strings(files)
+	if err := validateMigrationFiles(files); err != nil {
+		return err
+	}
 
 	for _, file := range files {
 		version := strings.TrimSuffix(filepath.Base(file), ".up.sql")
@@ -77,6 +80,62 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, migrationsDir string) erro
 	return nil
 }
 
+func validateMigrationFiles(files []string) error {
+	seenByNumber := make(map[string]string, len(files))
+	for _, file := range files {
+		version := migrationVersion(file)
+		number := migrationNumber(version)
+		if number == "" {
+			return fmt.Errorf("migration %s must start with a numeric prefix", filepath.Base(file))
+		}
+		if previous, ok := seenByNumber[number]; ok {
+			if !isAllowedLegacyDuplicateMigration(number, migrationVersion(previous), version) {
+				return fmt.Errorf("duplicate migration number %s: %s and %s", number, filepath.Base(previous), filepath.Base(file))
+			}
+		}
+		seenByNumber[number] = file
+	}
+	return nil
+}
+
+func migrationVersion(file string) string {
+	return strings.TrimSuffix(filepath.Base(file), ".up.sql")
+}
+
+func migrationNumber(version string) string {
+	index := strings.Index(version, "_")
+	if index <= 0 {
+		return ""
+	}
+	number := version[:index]
+	for _, char := range number {
+		if char < '0' || char > '9' {
+			return ""
+		}
+	}
+	return number
+}
+
+func isAllowedLegacyDuplicateMigration(number string, versions ...string) bool {
+	allowedVersions, ok := legacyDuplicateMigrationNumbers[number]
+	if !ok {
+		return false
+	}
+	for _, version := range versions {
+		if _, ok := allowedVersions[version]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+var legacyDuplicateMigrationNumbers = map[string]map[string]struct{}{
+	"000019": {
+		"000019_chat_full":      {},
+		"000019_scheduler_demo": {},
+	},
+}
+
 func Seed(ctx context.Context, pool *pgxpool.Pool, initialAdminPassword string) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
@@ -94,7 +153,7 @@ ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, sort_order = EXCLUDED.sor
 	if _, err := tx.Exec(ctx, `
 INSERT INTO sys_roles (id, code, name, description)
 VALUES (1, 'ADMIN', 'System Administrator', 'Full system access')
-ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description`); err != nil {
+ON CONFLICT (code) DO NOTHING`); err != nil {
 		return err
 	}
 

@@ -9,6 +9,7 @@ export type UserRow = {
   status: 'ACTIVE' | 'DISABLED';
   department?: string | null;
   roles?: string | null;
+  role_ids?: number[];
 };
 
 export type Page<T> = {
@@ -29,8 +30,10 @@ export type UserForm = {
   display_name: string;
   email?: string;
   phone?: string;
+  department_id?: number;
   status?: 'ACTIVE' | 'DISABLED';
   role_id?: number;
+  role_ids?: number[];
 };
 
 export async function resetUserPassword(id: number, password: string): Promise<void> {

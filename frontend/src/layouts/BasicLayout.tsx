@@ -26,12 +26,13 @@ import {
   RobotOutlined,
   ScheduleOutlined,
   SettingOutlined,
+  SwapOutlined,
   ShoppingCartOutlined,
   TeamOutlined,
   UserOutlined,
   WechatOutlined,
 } from '@ant-design/icons';
-import { Avatar, Badge, Breadcrumb, Button, ColorPicker, Divider, Drawer, Dropdown, Empty, Form, Input, Layout, Menu, Modal, Popover, Segmented, Select, Slider, Space, Spin, Switch, Tabs, Typography } from 'antd';
+import { Avatar, Badge, Breadcrumb, Button, ColorPicker, Divider, Drawer, Dropdown, Empty, Form, Input, Layout, Menu, Modal, Popover, Segmented, Select, Slider, Space, Spin, Switch, Tabs, Typography, type MenuProps } from 'antd';
 import { useEffect, useMemo, useState, type ReactNode, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { changePasswordApi } from '../api/auth';
@@ -67,6 +68,8 @@ export function BasicLayout() {
   const clearSession = useAuthStore((state) => state.clearSession);
   const accessToken = useAuthStore((state) => state.accessToken);
   const user = useAuthStore((state) => state.user);
+  const activeRoleCode = useAuthStore((state) => state.activeRoleCode);
+  const setActiveRoleCode = useAuthStore((state) => state.setActiveRoleCode);
   const sidebarTheme = useAppearanceStore((state) => state.sidebarTheme);
   const contentPadding = useAppearanceStore((state) => state.contentPadding);
   const tabStyle = useAppearanceStore((state) => state.tabStyle);
@@ -83,7 +86,22 @@ export function BasicLayout() {
   const pageTitle = currentTrail.at(-1)?.name ?? 'Workspace';
   const breadcrumbItems = [{ title: 'Home' }, ...currentTrail.map((item) => ({ title: item.name }))];
   const userDisplayName = user?.display_name || user?.username || '';
-  const userRoleText = useMemo(() => (user?.roles ?? []).filter(Boolean).join('、'), [user?.roles]);
+  const activeRole = useMemo(
+    () => user?.roles?.find((role) => role.code === activeRoleCode) ?? user?.active_role ?? user?.roles?.[0],
+    [activeRoleCode, user?.active_role, user?.roles],
+  );
+  const accountMenuItems: MenuProps['items'] = useMemo(() => [
+    { key: 'password', icon: <LockOutlined />, label: <span className="header-dropdown-item">修改密码</span> },
+    { type: 'divider' },
+    { key: 'logout', icon: <LogoutOutlined />, label: <span className="header-dropdown-item">退出登录</span> },
+  ], []);
+  const roleMenuItems: MenuProps['items'] = useMemo(
+    () => (user?.roles ?? []).map((role) => ({
+      key: `role:${role.code}`,
+      label: <span className="header-dropdown-item header-role-option">{role.name}</span>,
+    })),
+    [user?.roles],
+  );
 
   // Tab bar state
   interface TabItem { key: string; label: string; path: string }
@@ -298,7 +316,7 @@ export function BasicLayout() {
     message.success('已全部标记为已读');
   };
 
-  const handleUserMenuClick = ({ key }: { key: string }) => {
+  const handleAccountMenuClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'password') {
       setPasswordOpen(true);
       return;
@@ -306,6 +324,18 @@ export function BasicLayout() {
     if (key === 'logout') {
       clearSession();
       navigate('/login');
+    }
+  };
+
+  const handleRoleMenuClick: MenuProps['onClick'] = ({ key }) => {
+    const roleKey = String(key);
+    if (!roleKey.startsWith('role:')) {
+      return;
+    }
+    const nextRoleCode = roleKey.slice('role:'.length);
+    if (nextRoleCode && nextRoleCode !== activeRoleCode) {
+      setActiveRoleCode(nextRoleCode);
+      window.location.assign('/dashboard');
     }
   };
 
@@ -456,26 +486,39 @@ export function BasicLayout() {
               aria-label="全局外观"
               onClick={() => setAppearanceOpen(true)}
             />
-            <Dropdown
-              trigger={['click']}
-              placement="bottomRight"
-              menu={{
-                items: [
-                  { key: 'password', icon: <LockOutlined />, label: <span className="header-dropdown-item">修改密码</span> },
-                  { type: 'divider' },
-                  { key: 'logout', icon: <LogoutOutlined />, label: <span className="header-dropdown-item">退出登录</span> },
-                ],
-                onClick: handleUserMenuClick,
-              }}
-            >
-              <Space className="user-menu">
-                <Avatar size="small" icon={<UserOutlined />} />
-                <Typography.Text className="user-menu-name">
-                  <span className="user-menu-display">{userDisplayName}</span>
-                  {userRoleText && <span className="user-menu-role">（{userRoleText}）</span>}
-                </Typography.Text>
-              </Space>
-            </Dropdown>
+            <div className="identity-menu-group">
+              <Dropdown
+                trigger={['click']}
+                placement="bottomRight"
+                menu={{
+                  items: accountMenuItems,
+                  onClick: handleAccountMenuClick,
+                }}
+              >
+                <div className="user-menu">
+                  <Avatar size={32} icon={<UserOutlined />} />
+                  <div className="user-menu-info">
+                    <span className="user-menu-name">{userDisplayName}</span>
+                    {activeRole && <span className="user-menu-role">{activeRole.name}</span>}
+                  </div>
+                </div>
+              </Dropdown>
+              {activeRole && (
+                <Dropdown
+                  trigger={['click']}
+                  placement="bottomRight"
+                  menu={{
+                    items: roleMenuItems,
+                    selectedKeys: activeRole?.code ? [`role:${activeRole.code}`] : [],
+                    onClick: handleRoleMenuClick,
+                  }}
+                >
+                  <button type="button" className="role-switch-btn">
+                    <SwapOutlined />
+                  </button>
+                </Dropdown>
+              )}
+            </div>
           </div>
         </Header>
         <Content className="app-content">

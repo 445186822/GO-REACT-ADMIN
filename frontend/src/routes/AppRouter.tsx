@@ -52,7 +52,7 @@ function AuthBootstrap({ children }: { children: ReactNode }) {
   }, [accessToken, clearSession, setUser]);
 
   if (!ready) {
-    return <div className="app-loading">加载中...</div>;
+    return null;
   }
 
   return children;
@@ -67,7 +67,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 function LazyPage({ children }: { children: ReactNode }) {
-  return <Suspense fallback={<div className="app-loading">页面加载中...</div>}>{children}</Suspense>;
+  return <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0', color: '#667085' }}>加载中...</div>}>{children}</Suspense>;
 }
 
 export function AppRouter() {

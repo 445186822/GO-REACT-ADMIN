@@ -135,7 +135,6 @@ export function SchedulerPage() {
         rowKey="id"
         search={{ labelWidth: 'auto' }}
         headerTitle="定时任务"
-        scroll={{ x: 1180 }}
         toolBarRender={() => [
           <Permission code="scheduler:create" key="add">
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setOpen(true); }}>新增任务</Button>
@@ -207,7 +206,7 @@ function ExecutionLogs({ taskId, refreshKey }: { taskId: number; refreshKey: num
 
   useEffect(() => {
     actionRef.current?.reload();
-  }, [refreshKey, taskId]);
+  }, [refreshKey]);
 
   const columns: ProColumns<ExecutionRow>[] = [
     { title: 'ID', dataIndex: 'id', width: 60 },

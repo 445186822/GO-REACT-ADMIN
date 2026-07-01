@@ -1,4 +1,4 @@
-﻿import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   ModalForm,
   ProColumns,
@@ -32,7 +32,7 @@ export function CustomerListPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
   const columns: ProColumns<CustomerRow>[] = [
-    { title: '客户名称', dataIndex: 'name', copyable: true },
+    { title: '客户名称', dataIndex: 'name', copyable: true, width: 160 },
     {
       title: '级别',
       dataIndex: 'level',
@@ -44,10 +44,10 @@ export function CustomerListPage() {
       },
       render: (_, row) => <Tag color={row.level === 'IMPORTANT' ? 'red' : row.level === 'POTENTIAL' ? 'blue' : 'default'}>{levelText(row.level)}</Tag>,
     },
-    { title: '负责人', dataIndex: 'owner', search: false },
-    { title: '所属部门', dataIndex: 'department', search: false },
-    { title: '手机', dataIndex: 'phone', search: false },
-    { title: '邮箱', dataIndex: 'email', search: false },
+    { title: '负责人', dataIndex: 'owner', search: false, width: 150 },
+    { title: '所属部门', dataIndex: 'department', search: false, width: 140 },
+    { title: '手机', dataIndex: 'phone', search: false, width: 140 },
+    { title: '邮箱', dataIndex: 'email', search: false, width: 170 },
     {
       title: '状态',
       dataIndex: 'status',
@@ -123,6 +123,7 @@ export function CustomerListPage() {
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
+        scroll={{ x: 'max-content' }}
         search={{ labelWidth: 80 }}
         request={async (params) => {
           const data = await listCustomers({
@@ -133,7 +134,6 @@ export function CustomerListPage() {
           return { data: data.items, total: data.total, success: true };
         }}
         pagination={{ defaultPageSize: 10, showSizeChanger: false }}
-        scroll={{ x: 'max-content' }}
         rowSelection={{
           selectedRowKeys,
           onChange: (keys) => setSelectedRowKeys(keys),

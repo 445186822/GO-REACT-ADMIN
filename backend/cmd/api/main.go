@@ -30,19 +30,30 @@ func main() {
 	}
 	defer db.Close()
 
-	if err := database.Migrate(ctx, db, "migrations"); err != nil {
-		log.Error("database migration failed", "error", err)
-		os.Exit(1)
+	if cfg.AutoMigrate {
+		if err := database.Migrate(ctx, db, "migrations"); err != nil {
+			log.Error("database migration failed", "error", err)
+			os.Exit(1)
+		}
+	} else {
+		log.Info("database migration skipped by configuration")
 	}
-	if err := database.Seed(ctx, db, cfg.InitialAdminPassword); err != nil {
-		log.Error("database seed failed", "error", err)
-		os.Exit(1)
+	if cfg.AutoSeed {
+		if err := database.Seed(ctx, db, cfg.InitialAdminPassword); err != nil {
+			log.Error("database seed failed", "error", err)
+			os.Exit(1)
+		}
+	} else {
+		log.Info("database seed skipped by configuration")
 	}
 
-	// Start scheduler engine (real background execution)
-	schedEngine := scheduler.NewEngine(db, log)
-	schedEngine.Start()
-	defer schedEngine.Stop()
+	if cfg.SchedulerEnabled {
+		schedEngine := scheduler.NewEngine(db, log)
+		schedEngine.Start()
+		defer schedEngine.Stop()
+	} else {
+		log.Info("scheduler engine skipped by configuration")
+	}
 
 	server := apphttp.NewServer(cfg, log, db)
 

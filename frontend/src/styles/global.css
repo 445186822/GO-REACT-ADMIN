@@ -398,38 +398,79 @@ body {
   padding-top: 4px;
 }
 
-.user-menu {
+.identity-menu-group {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 3px;
+  height: 34px;
+  max-width: 286px;
+  padding: 2px 4px;
+  border: 1px solid #e4eaf2;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 8px;
   cursor: pointer;
-  max-width: 280px;
+  border-radius: 8px;
+  max-width: 200px;
+  transition: background 0.15s ease;
+}
+
+.user-menu:hover {
+  background: #f6f8fb;
+}
+
+.user-menu-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
 }
 
 .user-menu-name {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  max-width: 230px;
-  white-space: nowrap;
-}
-
-.user-menu-display,
-.user-menu-role {
-  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #101828;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.user-menu-display {
-  flex: 0 1 auto;
-  color: #1d2939;
+.user-menu-role {
+  font-size: 11px;
+  color: #667085;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.user-menu-role {
-  flex: 1 1 auto;
+.role-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #e4e7ec;
+  border-radius: 6px;
+  background: #f9fafb;
   color: #667085;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.role-switch-btn:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+  background: #e6f4ff;
 }
 
 .header-dropdown-item {
@@ -446,6 +487,13 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.header-role-option {
+  min-width: 88px;
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .notification-popover {
@@ -580,6 +628,7 @@ body {
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 24px rgba(16, 24, 40, 0.03);
 }
 
+
 .ant-pro-table .ant-pro-table-search {
   margin-bottom: 14px;
   border: 1px solid #dfe5ee;
@@ -601,10 +650,6 @@ body {
 .ant-table-wrapper .ant-table-container {
   border: 1px solid #eef2f6;
   border-radius: var(--app-radius, 6px);
-}
-
-.ant-table-wrapper .ant-table-content {
-  overflow-x: clip;
 }
 
 .ant-table-wrapper .ant-table-thead > tr > th {

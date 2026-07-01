@@ -1,12 +1,9 @@
 package collaboration
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,13 +20,24 @@ import (
 )
 
 type Handler struct {
-	db        *pgxpool.Pool
-	jwtSecret string
-	hub       *notificationHub
+	db            *pgxpool.Pool
+	jwtSecret     string
+	allowedOrigin string
+	hub           *notificationHub
+	ai            AIConfig
+	business      *BusinessAdapterRegistry
 }
 
-func NewHandler(db *pgxpool.Pool, jwtSecret string) *Handler {
-	return &Handler{db: db, jwtSecret: jwtSecret, hub: newNotificationHub()}
+type AIConfig struct {
+	AssistantEndpoint string
+	AssistantAPIKey   string
+	StreamBaseURL     string
+	StreamAPIKey      string
+	StreamModel       string
+}
+
+func NewHandler(db *pgxpool.Pool, jwtSecret string, allowedOrigin string, ai AIConfig) *Handler {
+	return &Handler{db: db, jwtSecret: jwtSecret, allowedOrigin: allowedOrigin, hub: newNotificationHub(), ai: ai, business: defaultBusinessAdapterRegistry()}
 }
 
 func (h *Handler) Register(g *echo.Group) {
@@ -111,7 +119,11 @@ func (h *Handler) ListTodos(c echo.Context) error {
 		}
 		return response.OK(c, items)
 	}
-	roles, err := h.currentUserRoleLabels(c.Request().Context(), userID)
+	roles, err := h.currentUserRoleLabels(c.Request().Context(), userID, middleware.ActiveRoleCode(c))
+	if err != nil {
+		return err
+	}
+	items, err := h.listPendingRuntimeTodos(c.Request().Context(), roles)
 	if err != nil {
 		return err
 	}
@@ -122,12 +134,12 @@ FROM approval_instances ai
 JOIN sys_users u ON u.id = ai.applicant_id
 JOIN workflow_definitions wd ON wd.id = ai.workflow_definition_id AND wd.deleted_at IS NULL AND wd.status = 'ACTIVE'
 WHERE ai.deleted_at IS NULL AND ai.status = 'PENDING'
+  AND NOT EXISTS (SELECT 1 FROM approval_instance_nodes ain WHERE ain.instance_id = ai.id)
 ORDER BY ai.created_at DESC`)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
-	items := make([]TodoRow, 0)
 	for rows.Next() {
 		var (
 			id          int64
@@ -175,11 +187,12 @@ ORDER BY ai.created_at DESC`)
 func (h *Handler) listDoneTodos(ctx context.Context, userID int64) ([]TodoRow, error) {
 	rows, err := h.db.Query(ctx, `
 SELECT aa.id, ai.id, ai.title, ai.biz_type, ai.biz_id, u.display_name, ai.current_step, ai.status,
-       aa.step_index, aa.action, aa.created_at, wd.definition
+       aa.step_index, aa.action, aa.created_at, wd.definition, ain.node_name, ain.assignee
 FROM approval_actions aa
 JOIN approval_instances ai ON ai.id = aa.instance_id AND ai.deleted_at IS NULL
 JOIN sys_users u ON u.id = ai.applicant_id
 JOIN workflow_definitions wd ON wd.id = ai.workflow_definition_id AND wd.deleted_at IS NULL
+LEFT JOIN approval_instance_nodes ain ON ain.id = aa.instance_node_id
 WHERE aa.approver_id = $1
 ORDER BY aa.created_at DESC, aa.id DESC`, userID)
 	if err != nil {
@@ -202,14 +215,21 @@ ORDER BY aa.created_at DESC, aa.id DESC`, userID)
 			action         string
 			actionAt       time.Time
 			definition     json.RawMessage
+			nodeName       *string
+			nodeAssignee   *string
 		)
-		if err := rows.Scan(&actionID, &instanceID, &title, &bizType, &bizID, &applicant, &currentStep, &approvalStatus, &stepIndex, &action, &actionAt, &definition); err != nil {
+		if err := rows.Scan(&actionID, &instanceID, &title, &bizType, &bizID, &applicant, &currentStep, &approvalStatus, &stepIndex, &action, &actionAt, &definition, &nodeName, &nodeAssignee); err != nil {
 			return nil, err
 		}
 		runtimeSteps := approvalRuntimeSteps(definition)
 		stepName := "第 " + strconv.Itoa(stepIndex+1) + " 步"
 		assignee := ""
-		if stepIndex >= 0 && stepIndex < len(runtimeSteps) {
+		if nodeName != nil && *nodeName != "" {
+			stepName = *nodeName
+			if nodeAssignee != nil {
+				assignee = *nodeAssignee
+			}
+		} else if stepIndex >= 0 && stepIndex < len(runtimeSteps) {
 			stepName = runtimeSteps[stepIndex].Name
 			assignee = runtimeSteps[stepIndex].Assignee
 		}
@@ -416,28 +436,46 @@ func (h *Handler) DeleteMessageTemplate(c echo.Context) error {
 }
 
 type ApprovalInstanceRow struct {
-	ID          int64               `json:"id"`
-	WorkflowID  int64               `json:"workflow_definition_id"`
-	Workflow    string              `json:"workflow"`
-	Title       string              `json:"title"`
-	BizType     string              `json:"biz_type"`
-	BizID       *string             `json:"biz_id"`
-	Applicant   string              `json:"applicant"`
-	Status      string              `json:"status"`
-	CurrentStep int                 `json:"current_step"`
-	FormData    json.RawMessage     `json:"form_data"`
-	CreatedAt   time.Time           `json:"created_at"`
-	Actions     []ApprovalActionRow `json:"actions,omitempty"`
-	applicantID int64
+	ID             int64               `json:"id"`
+	WorkflowID     int64               `json:"workflow_definition_id"`
+	Workflow       string              `json:"workflow"`
+	Title          string              `json:"title"`
+	BizType        string              `json:"biz_type"`
+	BizID          *string             `json:"biz_id"`
+	Applicant      string              `json:"applicant"`
+	Status         string              `json:"status"`
+	BusinessStatus string              `json:"business_status,omitempty"`
+	StatusDictCode string              `json:"status_dict_code,omitempty"`
+	CurrentStep    int                 `json:"current_step"`
+	FormData       json.RawMessage     `json:"form_data"`
+	CreatedAt      time.Time           `json:"created_at"`
+	Actions        []ApprovalActionRow `json:"actions,omitempty"`
+	Nodes          []ApprovalNodeRow   `json:"nodes,omitempty"`
+	applicantID    int64
 }
 
 type ApprovalActionRow struct {
-	ID        int64     `json:"id"`
-	StepIndex int       `json:"step_index"`
-	Approver  string    `json:"approver"`
-	Action    string    `json:"action"`
-	Comment   *string   `json:"comment"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          int64     `json:"id"`
+	StepIndex   int       `json:"step_index"`
+	FromNodeKey *string   `json:"from_node_key,omitempty"`
+	ToNodeKey   *string   `json:"to_node_key,omitempty"`
+	Approver    string    `json:"approver"`
+	Action      string    `json:"action"`
+	Comment     *string   `json:"comment"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type ApprovalNodeRow struct {
+	ID          int64           `json:"id"`
+	NodeKey     string          `json:"node_key"`
+	NodeName    string          `json:"node_name"`
+	NodeType    string          `json:"node_type"`
+	Assignee    string          `json:"assignee"`
+	StepIndex   int             `json:"step_index"`
+	Status      string          `json:"status"`
+	Config      json.RawMessage `json:"config"`
+	StartedAt   *time.Time      `json:"started_at,omitempty"`
+	CompletedAt *time.Time      `json:"completed_at,omitempty"`
 }
 
 func (h *Handler) ListApprovalInstances(c echo.Context) error {
@@ -445,7 +483,7 @@ func (h *Handler) ListApprovalInstances(c echo.Context) error {
 	bizType := c.QueryParam("biz_type")
 	status := c.QueryParam("status")
 	rows, err := h.db.Query(c.Request().Context(), `
-SELECT ai.id, ai.workflow_definition_id, wd.name, ai.title, ai.biz_type, ai.biz_id, u.display_name, ai.status, ai.current_step, ai.form_data, ai.created_at
+SELECT ai.id, ai.workflow_definition_id, wd.name, ai.title, ai.biz_type, ai.biz_id, u.display_name, ai.status, COALESCE(ai.business_status, ''), COALESCE(ai.status_dict_code, ''), ai.current_step, ai.form_data, ai.created_at
 FROM approval_instances ai
 JOIN workflow_definitions wd ON wd.id = ai.workflow_definition_id
 JOIN sys_users u ON u.id = ai.applicant_id
@@ -461,7 +499,7 @@ ORDER BY ai.created_at DESC`, keyword, bizType, status)
 	items := make([]ApprovalInstanceRow, 0)
 	for rows.Next() {
 		var item ApprovalInstanceRow
-		if err := rows.Scan(&item.ID, &item.WorkflowID, &item.Workflow, &item.Title, &item.BizType, &item.BizID, &item.Applicant, &item.Status, &item.CurrentStep, &item.FormData, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.WorkflowID, &item.Workflow, &item.Title, &item.BizType, &item.BizID, &item.Applicant, &item.Status, &item.BusinessStatus, &item.StatusDictCode, &item.CurrentStep, &item.FormData, &item.CreatedAt); err != nil {
 			return err
 		}
 		items = append(items, item)
@@ -495,11 +533,19 @@ func (h *Handler) SubmitApproval(c echo.Context) error {
 	if req.BizType == "" {
 		req.BizType = workflow.Category
 	}
+	formData := json.RawMessage(defaultJSON(req.FormData, "{}"))
+	startPlan, err := buildApprovalStartPlan(workflow.Definition, formData)
+	if err != nil {
+		return err
+	}
 	var id int64
 	if err := tx.QueryRow(c.Request().Context(), `
-INSERT INTO approval_instances (workflow_definition_id, title, biz_type, biz_id, applicant_id, form_data)
-VALUES ($1, $2, $3, $4, $5, $6::jsonb) RETURNING id`,
-		req.WorkflowID, req.Title, req.BizType, req.BizID, middleware.CurrentUserID(c), defaultJSON(req.FormData, "{}")).Scan(&id); err != nil {
+INSERT INTO approval_instances (workflow_definition_id, title, biz_type, biz_id, applicant_id, status, current_step, current_node_key, form_data, workflow_snapshot)
+VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, ''), $9::jsonb, $10::jsonb) RETURNING id`,
+		req.WorkflowID, req.Title, req.BizType, req.BizID, middleware.CurrentUserID(c), startPlan.InstanceStatus, startPlan.CurrentStep, startPlan.CurrentNodeKey, formData, workflow.Definition).Scan(&id); err != nil {
+		return err
+	}
+	if err := insertApprovalInstanceNodes(c.Request().Context(), tx, id, startPlan.Nodes); err != nil {
 		return err
 	}
 	if err := tx.Commit(c.Request().Context()); err != nil {
@@ -516,13 +562,13 @@ func (h *Handler) GetApprovalInstance(c echo.Context) error {
 		return err
 	}
 	row := h.db.QueryRow(c.Request().Context(), `
-SELECT ai.id, ai.workflow_definition_id, wd.name, ai.title, ai.biz_type, ai.biz_id, ai.applicant_id, u.display_name, ai.status, ai.current_step, ai.form_data, ai.created_at
+SELECT ai.id, ai.workflow_definition_id, wd.name, ai.title, ai.biz_type, ai.biz_id, ai.applicant_id, u.display_name, ai.status, COALESCE(ai.business_status, ''), COALESCE(ai.status_dict_code, ''), ai.current_step, ai.form_data, ai.created_at
 FROM approval_instances ai
 JOIN workflow_definitions wd ON wd.id = ai.workflow_definition_id
 JOIN sys_users u ON u.id = ai.applicant_id
 WHERE ai.id=$1 AND ai.deleted_at IS NULL`, id)
 	var item ApprovalInstanceRow
-	if err := row.Scan(&item.ID, &item.WorkflowID, &item.Workflow, &item.Title, &item.BizType, &item.BizID, &item.applicantID, &item.Applicant, &item.Status, &item.CurrentStep, &item.FormData, &item.CreatedAt); err != nil {
+	if err := row.Scan(&item.ID, &item.WorkflowID, &item.Workflow, &item.Title, &item.BizType, &item.BizID, &item.applicantID, &item.Applicant, &item.Status, &item.BusinessStatus, &item.StatusDictCode, &item.CurrentStep, &item.FormData, &item.CreatedAt); err != nil {
 		if err == pgx.ErrNoRows {
 			return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "审批实例不存在")
 		}
@@ -533,6 +579,11 @@ WHERE ai.id=$1 AND ai.deleted_at IS NULL`, id)
 		return err
 	}
 	item.Actions = actions
+	nodes, err := listApprovalNodes(c.Request().Context(), h.db, id)
+	if err != nil {
+		return err
+	}
+	item.Nodes = nodes
 	return response.OK(c, item)
 }
 
@@ -563,11 +614,34 @@ func (h *Handler) ActionApproval(c echo.Context) error {
 	var title string
 	var currentStatus string
 	var applicantID int64
-	if err := tx.QueryRow(c.Request().Context(), `SELECT workflow_definition_id, current_step, title, status, applicant_id FROM approval_instances WHERE id=$1 AND deleted_at IS NULL`, id).Scan(&workflowID, &currentStep, &title, &currentStatus, &applicantID); err != nil {
+	var workflowSnapshot json.RawMessage
+	var currentNodeKey *string
+	var formData json.RawMessage
+	var bizType string
+	var bizID *string
+	if err := tx.QueryRow(c.Request().Context(), `SELECT workflow_definition_id, current_step, title, status, applicant_id, workflow_snapshot, current_node_key, form_data, biz_type, biz_id FROM approval_instances WHERE id=$1 AND deleted_at IS NULL`, id).Scan(&workflowID, &currentStep, &title, &currentStatus, &applicantID, &workflowSnapshot, &currentNodeKey, &formData, &bizType, &bizID); err != nil {
 		return err
 	}
 	if currentStatus != "PENDING" {
 		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "该审批已处理，不能重复操作")
+	}
+	if currentNodeKey != nil && *currentNodeKey != "" {
+		result, handled, err := h.actionRuntimeApproval(c.Request().Context(), tx, workflowID, id, title, applicantID, bizType, bizID, *currentNodeKey, workflowSnapshot, formData, req, middleware.CurrentUserID(c), middleware.ActiveRoleCode(c))
+		if err != nil {
+			return err
+		}
+		if handled {
+			if err := tx.Commit(c.Request().Context()); err != nil {
+				return err
+			}
+			if result.NextAssignee != "" {
+				_ = h.notifyAssigneeUsers(c.Request().Context(), result.NextAssignee, "Approval pending", title, middleware.CurrentUserID(c))
+			} else if result.NotifyApplicant {
+				_ = h.notifyUser(c.Request().Context(), applicantID, "Approval updated", title+" -> "+result.Status, middleware.CurrentUserID(c))
+			}
+			h.hub.BroadcastAll(map[string]string{"event": "approval_updated"})
+			return response.OK(c, map[string]string{"status": result.Status})
+		}
 	}
 	runtimeSteps, workflowDefinition, hasNotificationNode, err := loadApprovalRuntime(c.Request().Context(), tx, workflowID)
 	if err != nil {
@@ -575,7 +649,7 @@ func (h *Handler) ActionApproval(c echo.Context) error {
 	}
 	if currentStep < len(runtimeSteps) {
 		step := runtimeSteps[currentStep]
-		roles, err := h.currentUserRoleLabels(c.Request().Context(), middleware.CurrentUserID(c))
+		roles, err := h.currentUserRoleLabels(c.Request().Context(), middleware.CurrentUserID(c), middleware.ActiveRoleCode(c))
 		if err != nil {
 			return err
 		}
@@ -613,16 +687,17 @@ func (h *Handler) ActionApproval(c echo.Context) error {
 }
 
 type approvalWorkflowRuntime struct {
-	ID       int64
-	Category string
+	ID         int64
+	Category   string
+	Definition json.RawMessage
 }
 
 func resolveApprovalWorkflow(ctx context.Context, tx pgx.Tx, workflowID int64) (approvalWorkflowRuntime, error) {
 	var item approvalWorkflowRuntime
 	err := tx.QueryRow(ctx, `
-SELECT id, category
+SELECT id, category, definition
 FROM workflow_definitions
-WHERE id=$1 AND deleted_at IS NULL AND status='ACTIVE' AND category='approval'`, workflowID).Scan(&item.ID, &item.Category)
+WHERE id=$1 AND deleted_at IS NULL AND status='ACTIVE' AND category='approval'`, workflowID).Scan(&item.ID, &item.Category, &item.Definition)
 	if err == pgx.ErrNoRows {
 		return item, response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "审批工作流不可用")
 	}
@@ -650,7 +725,7 @@ WHERE id=$1 AND deleted_at IS NULL AND status='ACTIVE'`, workflowID).Scan(&defin
 
 func (h *Handler) listApprovalActions(ctx context.Context, instanceID int64) ([]ApprovalActionRow, error) {
 	rows, err := h.db.Query(ctx, `
-SELECT aa.id, aa.step_index, u.display_name, aa.action, aa.comment, aa.created_at
+SELECT aa.id, aa.step_index, aa.from_node_key, aa.to_node_key, u.display_name, aa.action, aa.comment, aa.created_at
 FROM approval_actions aa
 JOIN sys_users u ON u.id = aa.approver_id
 WHERE aa.instance_id = $1
@@ -662,7 +737,7 @@ ORDER BY aa.created_at, aa.id`, instanceID)
 	items := make([]ApprovalActionRow, 0)
 	for rows.Next() {
 		var item ApprovalActionRow
-		if err := rows.Scan(&item.ID, &item.StepIndex, &item.Approver, &item.Action, &item.Comment, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.StepIndex, &item.FromNodeKey, &item.ToNodeKey, &item.Approver, &item.Action, &item.Comment, &item.CreatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
@@ -670,12 +745,15 @@ ORDER BY aa.created_at, aa.id`, instanceID)
 	return items, rows.Err()
 }
 
-func (h *Handler) currentUserRoleLabels(ctx context.Context, userID int64) ([]string, error) {
+func (h *Handler) currentUserRoleLabels(ctx context.Context, userID int64, activeRole string) ([]string, error) {
 	rows, err := h.db.Query(ctx, `
 SELECT r.code, r.name
 FROM sys_roles r
 JOIN sys_user_roles ur ON ur.role_id = r.id
-WHERE ur.user_id = $1 AND r.deleted_at IS NULL AND r.status = 'ACTIVE'`, userID)
+WHERE ur.user_id = $1
+  AND ($2 = '' OR lower(r.code) = lower($2) OR lower(r.name) = lower($2))
+  AND r.deleted_at IS NULL
+  AND r.status = 'ACTIVE'`, userID, activeRole)
 	if err != nil {
 		return nil, err
 	}
@@ -775,13 +853,16 @@ ORDER BY u.id`, labels)
 }
 
 type WorkflowRow struct {
-	ID          int64           `json:"id"`
-	Name        string          `json:"name"`
-	Category    string          `json:"category"`
-	Description *string         `json:"description"`
-	Definition  json.RawMessage `json:"definition"`
-	Status      string          `json:"status"`
-	UpdatedAt   time.Time       `json:"updated_at"`
+	ID             int64           `json:"id"`
+	Name           string          `json:"name"`
+	Category       string          `json:"category"`
+	Description    *string         `json:"description"`
+	Definition     json.RawMessage `json:"definition"`
+	Status         string          `json:"status"`
+	BizType        string          `json:"biz_type,omitempty"`
+	AdapterCode    string          `json:"adapter_code,omitempty"`
+	StatusDictCode string          `json:"status_dict_code,omitempty"`
+	UpdatedAt      time.Time       `json:"updated_at"`
 }
 
 func (h *Handler) ListWorkflows(c echo.Context) error {
@@ -789,13 +870,16 @@ func (h *Handler) ListWorkflows(c echo.Context) error {
 	category := c.QueryParam("category")
 	status := c.QueryParam("status")
 	rows, err := h.db.Query(c.Request().Context(), `
-SELECT id, name, category, description, definition, status, updated_at
-FROM workflow_definitions
-WHERE deleted_at IS NULL
-  AND ($1 = '' OR name ILIKE '%' || $1 || '%' OR COALESCE(description, '') ILIKE '%' || $1 || '%')
-  AND ($2 = '' OR category = $2)
-  AND ($3 = '' OR status = $3)
-ORDER BY updated_at DESC`, keyword, category, status)
+SELECT wd.id, wd.name, wd.category, wd.description, wd.definition, wd.status,
+       COALESCE(wb.biz_type, ''), COALESCE(wb.adapter_code, ''), COALESCE(wb.status_dict_code, ''),
+       wd.updated_at
+FROM workflow_definitions wd
+LEFT JOIN workflow_bindings wb ON wb.workflow_definition_id = wd.id AND wb.enabled = true
+WHERE wd.deleted_at IS NULL
+  AND ($1 = '' OR wd.name ILIKE '%' || $1 || '%' OR COALESCE(wd.description, '') ILIKE '%' || $1 || '%')
+  AND ($2 = '' OR wd.category = $2)
+  AND ($3 = '' OR wd.status = $3)
+ORDER BY wd.updated_at DESC`, keyword, category, status)
 	if err != nil {
 		return err
 	}
@@ -803,7 +887,7 @@ ORDER BY updated_at DESC`, keyword, category, status)
 	items := make([]WorkflowRow, 0)
 	for rows.Next() {
 		var item WorkflowRow
-		if err := rows.Scan(&item.ID, &item.Name, &item.Category, &item.Description, &item.Definition, &item.Status, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Category, &item.Description, &item.Definition, &item.Status, &item.BizType, &item.AdapterCode, &item.StatusDictCode, &item.UpdatedAt); err != nil {
 			return err
 		}
 		items = append(items, item)
@@ -828,11 +912,27 @@ func (h *Handler) CreateWorkflow(c echo.Context) error {
 	if req.Status == "" {
 		req.Status = "DRAFT"
 	}
+	tx, err := h.db.Begin(c.Request().Context())
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(c.Request().Context()) }()
+
+	definition := json.RawMessage(defaultJSON(req.Definition, "{}"))
 	var id int64
-	if err := h.db.QueryRow(c.Request().Context(), `
+	if err := tx.QueryRow(c.Request().Context(), `
 INSERT INTO workflow_definitions (name, category, description, definition, status, created_by)
 VALUES ($1,$2,$3,$4::jsonb,$5,$6) RETURNING id`,
-		req.Name, req.Category, req.Description, defaultJSON(req.Definition, "{}"), req.Status, middleware.CurrentUserID(c)).Scan(&id); err != nil {
+		req.Name, req.Category, req.Description, definition, req.Status, middleware.CurrentUserID(c)).Scan(&id); err != nil {
+		return err
+	}
+	if err := upsertWorkflowBinding(c.Request().Context(), tx, id, req.BizType, req.AdapterCode, req.StatusDictCode); err != nil {
+		return err
+	}
+	if err := syncWorkflowBusinessMappings(c.Request().Context(), tx, id, definition); err != nil {
+		return err
+	}
+	if err := tx.Commit(c.Request().Context()); err != nil {
 		return err
 	}
 	return response.Created(c, map[string]int64{"id": id})
@@ -847,9 +947,24 @@ func (h *Handler) UpdateWorkflow(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return err
 	}
-	if _, err := h.db.Exec(c.Request().Context(), `
+	tx, err := h.db.Begin(c.Request().Context())
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(c.Request().Context()) }()
+	definition := json.RawMessage(defaultJSON(req.Definition, "{}"))
+	if _, err := tx.Exec(c.Request().Context(), `
 UPDATE workflow_definitions SET name=$2, category=$3, description=$4, definition=$5::jsonb, status=$6, updated_at=now()
-WHERE id=$1 AND deleted_at IS NULL`, id, req.Name, req.Category, req.Description, defaultJSON(req.Definition, "{}"), req.Status); err != nil {
+WHERE id=$1 AND deleted_at IS NULL`, id, req.Name, req.Category, req.Description, definition, req.Status); err != nil {
+		return err
+	}
+	if err := upsertWorkflowBinding(c.Request().Context(), tx, id, req.BizType, req.AdapterCode, req.StatusDictCode); err != nil {
+		return err
+	}
+	if err := syncWorkflowBusinessMappings(c.Request().Context(), tx, id, definition); err != nil {
+		return err
+	}
+	if err := tx.Commit(c.Request().Context()); err != nil {
 		return err
 	}
 	return response.OK(c, map[string]bool{"updated": true})
@@ -965,102 +1080,6 @@ func (h *Handler) GetWorkflowInstance(c echo.Context) error {
 	return response.OK(c, map[string]any{"id": id, "logs": logs})
 }
 
-type AIMessageRow struct {
-	ID        int64     `json:"id"`
-	Role      string    `json:"role"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type AIChatRequest struct {
-	Message string `json:"message"`
-}
-
-func (h *Handler) ListAIMessages(c echo.Context) error {
-	rows, err := h.db.Query(c.Request().Context(), `
-SELECT id, role, content, created_at
-FROM ai_assistant_messages
-WHERE user_id=$1
-ORDER BY created_at DESC
-LIMIT 50`, middleware.CurrentUserID(c))
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	items := make([]AIMessageRow, 0)
-	for rows.Next() {
-		var item AIMessageRow
-		if err := rows.Scan(&item.ID, &item.Role, &item.Content, &item.CreatedAt); err != nil {
-			return err
-		}
-		items = append(items, item)
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	return response.OK(c, items)
-}
-
-func (h *Handler) ChatAI(c echo.Context) error {
-	var req AIChatRequest
-	if err := c.Bind(&req); err != nil {
-		return err
-	}
-	if req.Message == "" {
-		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "消息内容不能为空")
-	}
-	endpoint := os.Getenv("AI_ASSISTANT_ENDPOINT")
-	if endpoint == "" {
-		return response.NewError(http.StatusServiceUnavailable, "AI_NOT_CONFIGURED", "AI 服务未配置，请设置 AI_ASSISTANT_ENDPOINT")
-	}
-	userID := middleware.CurrentUserID(c)
-	if _, err := h.db.Exec(c.Request().Context(), `INSERT INTO ai_assistant_messages (user_id, role, content) VALUES ($1,'user',$2)`, userID, req.Message); err != nil {
-		return err
-	}
-	reply, err := callAIEndpoint(c.Request().Context(), endpoint, os.Getenv("AI_ASSISTANT_API_KEY"), req.Message)
-	if err != nil {
-		return err
-	}
-	if _, err := h.db.Exec(c.Request().Context(), `INSERT INTO ai_assistant_messages (user_id, role, content) VALUES ($1,'assistant',$2)`, userID, reply); err != nil {
-		return err
-	}
-	return response.OK(c, map[string]string{"reply": reply})
-}
-
-func callAIEndpoint(ctx context.Context, endpoint string, apiKey string, message string) (string, error) {
-	body, _ := json.Marshal(map[string]string{"message": message})
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return "", err
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	if apiKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
-	}
-	res, err := http.DefaultClient.Do(httpReq)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	if err != nil {
-		return "", err
-	}
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return "", response.NewError(http.StatusBadGateway, "AI_PROVIDER_ERROR", string(data))
-	}
-	var parsed struct {
-		Reply string `json:"reply"`
-	}
-	if err := json.Unmarshal(data, &parsed); err != nil {
-		return "", err
-	}
-	if parsed.Reply == "" {
-		return "", response.NewError(http.StatusBadGateway, "AI_PROVIDER_ERROR", "AI 提供方响应格式错误，缺少 reply 字段")
-	}
-	return parsed.Reply, nil
-}
-
 func (h *Handler) NotificationWS(c echo.Context) error {
 	token := c.QueryParam("token")
 	claims, err := auth.Parse(h.jwtSecret, token)
@@ -1068,15 +1087,7 @@ func (h *Handler) NotificationWS(c echo.Context) error {
 		return response.NewError(http.StatusUnauthorized, "AUTH_INVALID_TOKEN", "登录已过期，请重新登录")
 	}
 	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool {
-		origin := r.Header.Get("Origin")
-		if origin == "" {
-			return true
-		}
-		host := r.Host
-		if strings.Contains(origin, host) {
-			return true
-		}
-		return false
+		return middleware.OriginAllowed(r.Header.Get("Origin"), r.Host, h.allowedOrigin)
 	}}
 	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {

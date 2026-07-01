@@ -59,8 +59,10 @@ func (h *Handler) ListTasks(c echo.Context) error {
 	offset := (page - 1) * pageSize
 
 	var total int64
-	h.db.QueryRow(c.Request().Context(),
-		`SELECT count(*) FROM sys_scheduled_tasks WHERE ($1 = '' OR name ILIKE '%' || $1 || '%')`, keyword).Scan(&total)
+	if err := h.db.QueryRow(c.Request().Context(),
+		`SELECT count(*) FROM sys_scheduled_tasks WHERE ($1 = '' OR name ILIKE '%' || $1 || '%')`, keyword).Scan(&total); err != nil {
+		return err
+	}
 
 	rows, err := h.db.Query(c.Request().Context(),
 		`SELECT id, name, cron_expr, task_type, config::text, enabled,
@@ -144,8 +146,12 @@ func (h *Handler) DeleteTask(c echo.Context) error {
 	if err != nil {
 		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "invalid id")
 	}
-	h.db.Exec(c.Request().Context(), `DELETE FROM sys_task_executions WHERE task_id = $1`, id)
-	h.db.Exec(c.Request().Context(), `DELETE FROM sys_scheduled_tasks WHERE id = $1`, id)
+	if _, err := h.db.Exec(c.Request().Context(), `DELETE FROM sys_task_executions WHERE task_id = $1`, id); err != nil {
+		return err
+	}
+	if _, err := h.db.Exec(c.Request().Context(), `DELETE FROM sys_scheduled_tasks WHERE id = $1`, id); err != nil {
+		return err
+	}
 	return response.OK(c, map[string]bool{"deleted": true})
 }
 
@@ -155,7 +161,9 @@ func (h *Handler) ToggleTask(c echo.Context) error {
 		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "invalid id")
 	}
 	var enabled bool
-	h.db.QueryRow(c.Request().Context(), `UPDATE sys_scheduled_tasks SET enabled = NOT enabled, updated_at = now() WHERE id = $1 RETURNING enabled`, id).Scan(&enabled)
+	if err := h.db.QueryRow(c.Request().Context(), `UPDATE sys_scheduled_tasks SET enabled = NOT enabled, updated_at = now() WHERE id = $1 RETURNING enabled`, id).Scan(&enabled); err != nil {
+		return err
+	}
 	return response.OK(c, map[string]bool{"enabled": enabled})
 }
 
@@ -240,8 +248,10 @@ func (h *Handler) ListExecutions(c echo.Context) error {
 	offset := (page - 1) * pageSize
 
 	var total int64
-	h.db.QueryRow(c.Request().Context(),
-		`SELECT count(*) FROM sys_task_executions WHERE task_id = $1`, taskID).Scan(&total)
+	if err := h.db.QueryRow(c.Request().Context(),
+		`SELECT count(*) FROM sys_task_executions WHERE task_id = $1`, taskID).Scan(&total); err != nil {
+		return err
+	}
 
 	rows, err := h.db.Query(c.Request().Context(),
 		`SELECT id, task_id, status, to_char(started_at, 'YYYY-MM-DD HH24:MI:SS'),

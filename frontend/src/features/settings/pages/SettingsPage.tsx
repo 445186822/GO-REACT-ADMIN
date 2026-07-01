@@ -44,7 +44,7 @@ export function SettingsPage() {
   }, []);
 
   const columns: ProColumns<SettingRow>[] = [
-    { title: '配置键', dataIndex: 'setting_key', copyable: true },
+    { title: '配置键', dataIndex: 'setting_key', copyable: true, width: 150 },
     {
       title: '配置值',
       dataIndex: 'setting_value',
@@ -53,7 +53,7 @@ export function SettingsPage() {
       render: (_, row) => <Text className="settings-value" ellipsis>{settingValuePreview(row)}</Text>,
     },
     { title: '类型', dataIndex: 'value_type', width: 100, search: false, render: (_, row) => <Tag>{row.value_type}</Tag> },
-    { title: '说明', dataIndex: 'description', search: false, ellipsis: true },
+    { title: '说明', dataIndex: 'description', search: false, ellipsis: true, width: 200 },
     { title: '更新时间', dataIndex: 'updated_at', valueType: 'dateTime', width: 170, search: false },
     {
       title: '操作',
@@ -148,6 +148,7 @@ export function SettingsPage() {
                 actionRef={actionRef}
                 rowKey="id"
                 columns={columns}
+                scroll={{ x: 'max-content' }}
                 request={async (params) => {
                   const keyword = String(params.setting_key ?? '').trim().toLowerCase();
                   const data = keyword
@@ -160,7 +161,6 @@ export function SettingsPage() {
                 search={{ labelWidth: 80 }}
                 options={false}
                 pagination={{ defaultPageSize: 10, showSizeChanger: false }}
-                scroll={{ x: 'max-content' }}
               />
             </>
           ),

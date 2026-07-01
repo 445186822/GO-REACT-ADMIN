@@ -12,6 +12,7 @@ const featureSources = [
   'src/features/collaboration/pages/WorkflowPage.tsx',
 ].map((path) => readFileSync(resolve(process.cwd(), path), 'utf8'));
 const fileCenterSource = readFileSync(resolve(process.cwd(), 'src/features/file/pages/FileCenterPage.tsx'), 'utf8');
+const messageTemplateSource = readFileSync(resolve(process.cwd(), 'src/features/collaboration/pages/MessageTemplatePage.tsx'), 'utf8');
 
 function blockFor(selector: string) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -36,5 +37,10 @@ describe('layout chrome visual boundaries', () => {
   test('prevents file center table and browser scrollbar jitter', () => {
     expect(fileCenterSource).not.toContain('scroll={{ x: 1000 }}');
     expect(blockFor('html')).toContain('scrollbar-gutter: stable');
+  });
+
+  test('keeps empty message template table from forcing horizontal scrolling', () => {
+    expect(messageTemplateSource).not.toContain("scroll={{ x: '100%' }}");
+    expect(messageTemplateSource).toContain("scroll={{ x: 'max-content' }}");
   });
 });

@@ -72,7 +72,7 @@ export function DataDictPage() {
         </Tag>
       ),
     },
-    { title: '备注', dataIndex: 'remark', search: false, ellipsis: true },
+    { title: '备注', dataIndex: 'remark', search: false, ellipsis: true, width: 160 },
     {
       title: '操作',
       ...operationColumnProps<DictTypeRow>(240),
@@ -157,7 +157,7 @@ export function DataDictPage() {
         </Tag>
       ),
     },
-    { title: '备注', dataIndex: 'remark', ellipsis: true },
+    { title: '备注', dataIndex: 'remark', ellipsis: true, width: 160 },
     {
       title: '操作',
       ...operationColumnProps<DictItemRow>(180),
@@ -267,6 +267,7 @@ export function DataDictPage() {
               <ProTable<DictTypeRow>
                 actionRef={typeActionRef}
                 columns={typeColumns}
+                scroll={{ x: 'max-content' }}
                 request={async (params) => {
                   try {
                     const res = await listDictTypes({
@@ -284,7 +285,6 @@ export function DataDictPage() {
                 search={{ labelWidth: 'auto' }}
                 options={{ reload: true, density: false }}
                 pagination={{ defaultPageSize: 10 }}
-                scroll={{ x: 'max-content' }}
                 onRow={(row) => ({
                   onClick: () => selectType(row),
                   style: {
@@ -334,7 +334,7 @@ export function DataDictPage() {
                 search={false}
                 options={false}
                 pagination={false}
-                scroll={{ x: 'max-content', y: 400 }}
+                scroll={{ y: 400 }}
               />
             </Card>
           </Col>

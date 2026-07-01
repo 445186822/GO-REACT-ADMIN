@@ -28,10 +28,10 @@ export function FileCenterPage() {
         </BackendDownloadButton>
       ),
     },
-    { title: '类型', dataIndex: 'mime_type', search: false, render: (_, row) => <Tag>{row.mime_type}</Tag> },
-    { title: '大小', dataIndex: 'size', search: false, renderText: (value) => formatSize(Number(value)) },
-    { title: '上传人', dataIndex: 'uploader', search: false },
-    { title: '创建时间', dataIndex: 'created_at', valueType: 'dateTime', search: false },
+    { title: '类型', dataIndex: 'mime_type', search: false, render: (_, row) => <Tag>{row.mime_type}</Tag>, width: 100 },
+    { title: '大小', dataIndex: 'size', search: false, renderText: (value) => formatSize(Number(value)), width: 150 },
+    { title: '上传人', dataIndex: 'uploader', search: false, width: 150 },
+    { title: '创建时间', dataIndex: 'created_at', valueType: 'dateTime', search: false, width: 180 },
     {
       title: '操作',
       ...operationColumnProps<FileRow>(260),
@@ -109,6 +109,7 @@ export function FileCenterPage() {
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
+        scroll={{ x: 'max-content' }}
         search={{ labelWidth: 80 }}
         request={async (params) => {
           const data = await listFiles({
@@ -119,7 +120,6 @@ export function FileCenterPage() {
           return { data: data.items, total: data.total, success: true };
         }}
         pagination={{ defaultPageSize: 10, showSizeChanger: false }}
-        scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           <ExportButton key="export" onClick={exportFiles}>
             导出 Excel

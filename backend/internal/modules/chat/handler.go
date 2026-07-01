@@ -20,13 +20,14 @@ import (
 )
 
 type Handler struct {
-	db        *pgxpool.Pool
-	jwtSecret string
-	hub       *chatHub
+	db            *pgxpool.Pool
+	jwtSecret     string
+	allowedOrigin string
+	hub           *chatHub
 }
 
-func NewHandler(db *pgxpool.Pool, jwtSecret string) *Handler {
-	return &Handler{db: db, jwtSecret: jwtSecret, hub: newChatHub()}
+func NewHandler(db *pgxpool.Pool, jwtSecret string, allowedOrigin string) *Handler {
+	return &Handler{db: db, jwtSecret: jwtSecret, allowedOrigin: allowedOrigin, hub: newChatHub()}
 }
 
 func (h *Handler) Register(g *echo.Group) {
@@ -478,15 +479,21 @@ func (h *Handler) AddParticipants(c echo.Context) error {
 		if !active {
 			return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "用户不存在或已停用")
 		}
-		tag, err := tx.Exec(c.Request().Context(), `
+		// Check whether user is already an active participant
+		var alreadyIn bool
+		if err := tx.QueryRow(c.Request().Context(), `
+			SELECT EXISTS(SELECT 1 FROM chat_participants WHERE session_id = $1 AND user_id = $2 AND removed_at IS NULL)
+		`, sessionID, uid).Scan(&alreadyIn); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(c.Request().Context(), `
 			INSERT INTO chat_participants (session_id, user_id)
 			VALUES ($1, $2)
 			ON CONFLICT (session_id, user_id) DO UPDATE SET removed_at = NULL
-		`, sessionID, uid)
-		if err != nil {
+		`, sessionID, uid); err != nil {
 			return err
 		}
-		if tag.RowsAffected() > 0 {
+		if !alreadyIn {
 			added = append(added, uid)
 		}
 	}
@@ -622,7 +629,6 @@ func (h *Handler) SearchUsers(c echo.Context) error {
 }
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin:     func(r *http.Request) bool { return true },
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 }
@@ -745,7 +751,11 @@ func (h *Handler) ChatWS(c echo.Context) error {
 		return response.NewError(http.StatusUnauthorized, "AUTH_INVALID_TOKEN", "invalid token")
 	}
 
-	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
+	wsUpgrader := upgrader
+	wsUpgrader.CheckOrigin = func(r *http.Request) bool {
+		return middleware.OriginAllowed(r.Header.Get("Origin"), r.Host, h.allowedOrigin)
+	}
+	conn, err := wsUpgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		return err
 	}

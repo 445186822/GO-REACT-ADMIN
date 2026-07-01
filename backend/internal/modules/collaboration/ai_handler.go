@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 
 	"enterprise-demo/backend/internal/http/middleware"
@@ -15,9 +14,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 )
-
-const deepseekBaseURL = "https://api.deepseek.com/anthropic"
-const deepseekModel = "deepseek-v4-flash"
 
 func (h *Handler) registerAIRoutes(g *echo.Group) {
 	ai := g.Group("/ai", middleware.Auth(h.jwtSecret), middleware.RequirePermission(h.db))
@@ -50,23 +46,19 @@ func (h *Handler) Chat(c echo.Context) error {
 		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "messages required")
 	}
 
-	authToken := os.Getenv("AI_API_KEY")
-	if authToken == "" {
-		authToken = os.Getenv("AI_ASSISTANT_API_KEY")
-	}
-	if authToken == "" {
-		return response.NewError(http.StatusServiceUnavailable, "AI_NOT_CONFIGURED", "AI服务未配置API密钥")
+	if h.ai.StreamBaseURL == "" || h.ai.StreamModel == "" || h.ai.StreamAPIKey == "" {
+		return response.NewError(http.StatusServiceUnavailable, "AI_NOT_CONFIGURED", "AI服务未配置，请检查 AI_STREAM_BASE_URL、AI_STREAM_MODEL 和 AI_STREAM_API_KEY")
 	}
 
 	systemMsg := ChatMessage{
 		Role:    "system",
-		Content: "你是企业基础平台的内置AI助手，运行在DeepSeek模型上。你可以帮助用户解答系统使用问题、提供数据分析建议、协助编写文档等。请用中文回复，保持专业且友好的语气。",
+		Content: "你是企业基础平台的内置AI助手。你可以帮助用户解答系统使用问题、提供数据分析建议、协助编写文档等。请用中文回复，保持专业且友好的语气。",
 	}
 
 	allMessages := append([]ChatMessage{systemMsg}, req.Messages...)
 
 	apiReq := DeepSeekRequest{
-		Model:    deepseekModel,
+		Model:    h.ai.StreamModel,
 		Messages: allMessages,
 		Stream:   true,
 	}
@@ -74,12 +66,12 @@ func (h *Handler) Chat(c echo.Context) error {
 	body, _ := json.Marshal(apiReq)
 
 	httpReq, err := http.NewRequestWithContext(c.Request().Context(), "POST",
-		deepseekBaseURL+"/v1/messages", strings.NewReader(string(body)))
+		strings.TrimRight(h.ai.StreamBaseURL, "/")+"/v1/messages", strings.NewReader(string(body)))
 	if err != nil {
 		return err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("x-api-key", authToken)
+	httpReq.Header.Set("x-api-key", h.ai.StreamAPIKey)
 	httpReq.Header.Set("anthropic-version", "2023-06-01")
 
 	resp, err := http.DefaultClient.Do(httpReq)

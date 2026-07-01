@@ -48,7 +48,7 @@ export function RecycleBinPage() {
       render: (_, row) => <Tag>{tableLabel(row.source_table)}</Tag>,
     },
     { title: '记录ID', dataIndex: 'source_id', width: 90 },
-    { title: '摘要', dataIndex: 'summary', ellipsis: true },
+    { title: '摘要', dataIndex: 'summary', ellipsis: true, width: 150 },
     {
       title: '删除人',
       dataIndex: 'deleted_by',
@@ -131,6 +131,7 @@ export function RecycleBinPage() {
       <ProTable<RecycledRow>
         actionRef={actionRef}
         columns={columns}
+        scroll={{ x: 'max-content' }}
         request={async (params) => {
           try {
             const res = await listRecycled({
@@ -156,7 +157,6 @@ export function RecycleBinPage() {
           </Permission>,
         ]}
         pagination={{ defaultPageSize: 10 }}
-        scroll={{ x: 'max-content' }}
       />
     </div>
   );

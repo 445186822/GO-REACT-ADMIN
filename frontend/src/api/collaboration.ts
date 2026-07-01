@@ -106,19 +106,37 @@ export type ApprovalInstanceRow = {
   biz_id?: string | null;
   applicant: string;
   status: string;
+  business_status?: string;
+  status_dict_code?: string;
   current_step: number;
   form_data: Record<string, unknown>;
   created_at: string;
   actions?: ApprovalActionRow[];
+  nodes?: ApprovalNodeRow[];
 };
 
 export type ApprovalActionRow = {
   id: number;
   step_index: number;
+  from_node_key?: string | null;
+  to_node_key?: string | null;
   approver: string;
   action: 'APPROVE' | 'REJECT';
   comment?: string | null;
   created_at: string;
+};
+
+export type ApprovalNodeRow = {
+  id: number;
+  node_key: string;
+  node_name: string;
+  node_type: string;
+  assignee: string;
+  step_index: number;
+  status: 'WAITING' | 'RUNNING' | 'APPROVED' | 'REJECTED' | string;
+  config?: Record<string, unknown>;
+  started_at?: string | null;
+  completed_at?: string | null;
 };
 
 export async function listApprovalInstances(params?: { keyword?: string; biz_type?: string; status?: string }) {
@@ -146,6 +164,9 @@ export type WorkflowRow = {
   description?: string | null;
   definition: Record<string, unknown>;
   status: string;
+  biz_type?: string;
+  adapter_code?: string;
+  status_dict_code?: string;
   updated_at: string;
 };
 

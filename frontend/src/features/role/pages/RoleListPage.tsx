@@ -201,9 +201,9 @@ export function RoleListPage() {
 
   // ---------- columns ----------
   const columns: ProColumns<RoleRow>[] = [
-    { title: '角色编码', dataIndex: 'code', copyable: true },
-    { title: '角色名称', dataIndex: 'name' },
-    { title: '说明', dataIndex: 'description', search: false },
+    { title: '角色编码', dataIndex: 'code', copyable: true, width: 130 },
+    { title: '角色名称', dataIndex: 'name', width: 160 },
+    { title: '说明', dataIndex: 'description', search: false, width: 200 },
     {
       title: '状态',
       dataIndex: 'status',
@@ -252,11 +252,11 @@ export function RoleListPage() {
       <ProTable<RoleRow>
         rowKey="id"
         columns={columns}
+        scroll={{ x: 'max-content' }}
         search={false}
         dataSource={roles}
         pagination={false}
         loading={loading}
-        scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           canCreate && (
             <Button

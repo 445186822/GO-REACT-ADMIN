@@ -52,3 +52,9 @@ export const notification: NotificationInstance = new Proxy({} as NotificationIn
     return (...args: any[]) => (ensure(_notification, 'notification') as any)[prop](...args);
   },
 });
+
+/** Extract a human-readable message from an Axios error response */
+export function requestErrorMessage(err: unknown, fallback: string): string {
+  const response = (err as { response?: { data?: { message?: string } } }).response;
+  return response?.data?.message || fallback;
+}

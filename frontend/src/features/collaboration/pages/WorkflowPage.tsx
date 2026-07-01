@@ -118,6 +118,10 @@ export function WorkflowPage() {
 
   const activeNode = useMemo(() => nodes.find((item) => item.id === activeNodeId) ?? null, [activeNodeId, nodes]);
   const activeEdge = useMemo(() => edges.find((item) => item.id === activeEdgeId) ?? null, [activeEdgeId, edges]);
+  const nodeTargetOptions = useMemo(
+    () => nodes.map((node) => ({ value: String(node.data.key || node.id), label: String(node.data.name || node.id) })),
+    [nodes],
+  );
 
   const workflowColumns: ProColumns<WorkflowRow>[] = [
     {
@@ -137,7 +141,7 @@ export function WorkflowPage() {
       width: 110,
       render: (_, row) => <Tag color="blue">{row.category}</Tag>,
     },
-    { title: '说明', dataIndex: 'description', ellipsis: true, search: false },
+    { title: '说明', dataIndex: 'description', ellipsis: true, search: false, width: 200 },
     {
       title: '节点/连线',
       width: 110,
@@ -378,6 +382,19 @@ export function WorkflowPage() {
     setNodes((prev) => prev.map((node) => (node.id === currentId ? { ...node, data: { ...node.data, ...patch } } : node)));
   }
 
+  function updateActiveNodeConfig(patch: Record<string, unknown>) {
+    if (!activeNode) return;
+    updateActiveNodeData({ config: { ...(activeNode.data.config ?? {}), ...patch } });
+  }
+
+  function updateApprovalAction(code: 'APPROVE' | 'REJECT', patch: Record<string, unknown>) {
+    if (!activeNode) return;
+    const config = activeNode.data.config ?? {};
+    const actions = normalizeApprovalActions(config.actions);
+    const nextActions = actions.map((action) => (action.code === code ? { ...action, ...patch } : action));
+    updateActiveNodeConfig({ actions: nextActions });
+  }
+
   function updateActiveEdge(patch: Partial<WorkflowFlowEdge>) {
     if (!activeEdge) return;
     setEdges((prev) => prev.map((edge) => (edge.id === activeEdge.id ? { ...edge, ...patch } : edge)));
@@ -400,6 +417,9 @@ export function WorkflowPage() {
       description: selectedWorkflow.description,
       definition,
       status: nextStatus ?? selectedWorkflow.status,
+      biz_type: selectedWorkflow.biz_type,
+      adapter_code: selectedWorkflow.adapter_code,
+      status_dict_code: selectedWorkflow.status_dict_code,
     };
     await updateWorkflow(selectedWorkflow.id, payload);
     const updated = { ...selectedWorkflow, definition, status: payload.status };
@@ -429,6 +449,7 @@ export function WorkflowPage() {
                 actionRef={workflowRef}
                 rowKey="id"
                 columns={workflowColumns}
+                scroll={{ x: 'max-content' }}
                 request={async (params) => {
                   const data = await listWorkflows({
                     keyword: typeof params.name === 'string' ? params.name : undefined,
@@ -442,7 +463,6 @@ export function WorkflowPage() {
                 }}
                 search={{ labelWidth: 'auto', defaultCollapsed: true }}
                 options={{ reload: true, density: true }}
-                scroll={{ x: 'max-content' }}
               />
             ),
           },
@@ -593,6 +613,12 @@ export function WorkflowPage() {
                     onChange={(event) => updateActiveNodeData({ description: event.target.value })}
                   />
                 </Form.Item>
+                <WorkflowNodeConfigPanel
+                  node={activeNode}
+                  targetOptions={nodeTargetOptions}
+                  onConfigChange={updateActiveNodeConfig}
+                  onApprovalActionChange={updateApprovalAction}
+                />
                 <Space>
                   <Button icon={<CopyOutlined />} onClick={() => duplicateNode(activeNode)}>复制</Button>
                   <Button danger icon={<DeleteOutlined />} onClick={() => removeNode(activeNode.id)}>删除</Button>
@@ -633,6 +659,9 @@ export function WorkflowPage() {
           ]}
         />
         <ProFormTextArea name="description" label="说明" placeholder="描述此工作流的用途" />
+        <ProFormText name="biz_type" label="业务类型" placeholder="如：customer / expense_claim" />
+        <ProFormText name="adapter_code" label="业务适配器" placeholder="如：biz_customer；为空则只保存审批实例业务状态" />
+        <ProFormText name="status_dict_code" label="业务状态字典" placeholder="如：CUSTOMER_APPROVAL_STATUS" />
         <ProFormTextArea
           name="definition_text"
           label="流程定义 (JSON)"
@@ -673,6 +702,203 @@ function WorkflowGraphNode({ data, selected }: NodeProps<WorkflowFlowNode>) {
       <Handle type="source" position={Position.Right} className="workflow-flow-handle workflow-flow-handle-source" />
     </div>
   );
+}
+
+type NodeTargetOption = { value: string; label: string };
+type ApprovalActionConfig = {
+  code: 'APPROVE' | 'REJECT';
+  label: string;
+  target?: string;
+  instanceStatus?: string;
+  businessStatus?: string;
+  requireComment?: boolean;
+};
+
+function WorkflowNodeConfigPanel({
+  node,
+  targetOptions,
+  onConfigChange,
+  onApprovalActionChange,
+}: {
+  node: WorkflowFlowNode;
+  targetOptions: NodeTargetOption[];
+  onConfigChange: (patch: Record<string, unknown>) => void;
+  onApprovalActionChange: (code: 'APPROVE' | 'REJECT', patch: Record<string, unknown>) => void;
+}) {
+  const config = node.data.config ?? {};
+  const actions = normalizeApprovalActions(config.actions);
+  const approve = actions.find((item) => item.code === 'APPROVE') ?? actions[0];
+  const reject = actions.find((item) => item.code === 'REJECT') ?? actions[1];
+  const conditions = normalizeConditionRules(config.conditions);
+  const firstCondition = conditions[0] ?? { expression: '', target: '' };
+
+  if (node.data.nodeType === 'approval') {
+    return (
+      <>
+        <Form.Item label="通过后节点">
+          <Select allowClear value={approve.target} options={targetOptions} onChange={(target) => onApprovalActionChange('APPROVE', { target })} />
+        </Form.Item>
+        <Form.Item label="通过后流程状态">
+          <Select
+            value={approve.instanceStatus || 'PENDING'}
+            options={approvalStatusOptions()}
+            onChange={(instanceStatus) => onApprovalActionChange('APPROVE', { instanceStatus })}
+          />
+        </Form.Item>
+        <Form.Item label="通过后业务状态">
+          <Input
+            value={approve.businessStatus || ''}
+            placeholder="如：WAIT_PAY / CUSTOMER_APPROVED"
+            onChange={(event) => onApprovalActionChange('APPROVE', { businessStatus: event.target.value })}
+          />
+        </Form.Item>
+        <Form.Item label="驳回后节点">
+          <Select allowClear value={reject.target} options={targetOptions} onChange={(target) => onApprovalActionChange('REJECT', { target })} />
+        </Form.Item>
+        <Form.Item label="驳回后流程状态">
+          <Select
+            value={reject.instanceStatus || 'REJECTED'}
+            options={approvalStatusOptions()}
+            onChange={(instanceStatus) => onApprovalActionChange('REJECT', { instanceStatus })}
+          />
+        </Form.Item>
+        <Form.Item label="驳回后业务状态">
+          <Input
+            value={reject.businessStatus || ''}
+            placeholder="如：FINANCE_REJECTED / CUSTOMER_REJECTED"
+            onChange={(event) => onApprovalActionChange('REJECT', { businessStatus: event.target.value })}
+          />
+        </Form.Item>
+        <Form.Item label="驳回意见">
+          <Select
+            value={reject.requireComment ? 'required' : 'optional'}
+            options={[
+              { value: 'required', label: '必填' },
+              { value: 'optional', label: '选填' },
+            ]}
+            onChange={(value) => onApprovalActionChange('REJECT', { requireComment: value === 'required' })}
+          />
+        </Form.Item>
+      </>
+    );
+  }
+
+  if (node.data.nodeType === 'condition') {
+    return (
+      <>
+        <Form.Item label="条件表达式">
+          <Input
+            value={firstCondition.expression}
+            placeholder="form.amount > 1000"
+            onChange={(event) => onConfigChange({ conditions: [{ ...firstCondition, expression: event.target.value }] })}
+          />
+        </Form.Item>
+        <Form.Item label="满足后节点">
+          <Select
+            allowClear
+            value={firstCondition.target}
+            options={targetOptions}
+            onChange={(target) => onConfigChange({ conditions: [{ ...firstCondition, target }] })}
+          />
+        </Form.Item>
+        <Form.Item label="默认节点">
+          <Select allowClear value={String(config.defaultTarget ?? '') || undefined} options={targetOptions} onChange={(defaultTarget) => onConfigChange({ defaultTarget })} />
+        </Form.Item>
+      </>
+    );
+  }
+
+  if (node.data.nodeType === 'end') {
+    return (
+      <>
+        <Form.Item label="最终流程状态">
+          <Select value={String(config.finalStatus ?? 'APPROVED')} options={approvalStatusOptions()} onChange={(finalStatus) => onConfigChange({ finalStatus })} />
+        </Form.Item>
+        <Form.Item label="最终业务状态">
+          <Input
+            value={String(config.finalBusinessStatus ?? '')}
+            placeholder="如：PAID_APPROVED / CUSTOMER_ARCHIVED"
+            onChange={(event) => onConfigChange({ finalBusinessStatus: event.target.value })}
+          />
+        </Form.Item>
+      </>
+    );
+  }
+
+  if (node.data.nodeType === 'notification') {
+    return (
+      <>
+        <Form.Item label="通知模板">
+          <Input value={String(config.notificationTemplate ?? '')} onChange={(event) => onConfigChange({ notificationTemplate: event.target.value })} />
+        </Form.Item>
+        <Form.Item label="接收人">
+          <Input value={String(config.notificationRecipient ?? '')} onChange={(event) => onConfigChange({ notificationRecipient: event.target.value })} />
+        </Form.Item>
+      </>
+    );
+  }
+
+  if (node.data.nodeType === 'action') {
+    return (
+      <Form.Item label="后端动作">
+        <Input value={String(config.actionName ?? '')} placeholder="create_task / write_log" onChange={(event) => onConfigChange({ actionName: event.target.value })} />
+      </Form.Item>
+    );
+  }
+
+  if (node.data.nodeType === 'timer') {
+    return (
+      <>
+        <Form.Item label="等待时长">
+          <Input value={String(config.waitDuration ?? '')} placeholder="2h / 1d" onChange={(event) => onConfigChange({ waitDuration: event.target.value })} />
+        </Form.Item>
+        <Form.Item label="超时动作">
+          <Select
+            allowClear
+            value={String(config.timeoutAction ?? '') || undefined}
+            options={[
+              { value: 'APPROVE', label: '自动通过' },
+              { value: 'REMIND', label: '提醒' },
+            ]}
+            onChange={(timeoutAction) => onConfigChange({ timeoutAction })}
+          />
+        </Form.Item>
+      </>
+    );
+  }
+
+  return null;
+}
+
+function normalizeApprovalActions(value: unknown): ApprovalActionConfig[] {
+  const defaults: ApprovalActionConfig[] = [
+    { code: 'APPROVE', label: '通过', instanceStatus: 'PENDING' },
+    { code: 'REJECT', label: '驳回', instanceStatus: 'REJECTED', requireComment: true },
+  ];
+  if (!Array.isArray(value)) return defaults;
+  return defaults.map((item) => ({ ...item, ...(value.find((action) => isActionConfig(action) && action.code === item.code) as Partial<ApprovalActionConfig> | undefined) }));
+}
+
+function normalizeConditionRules(value: unknown): Array<{ expression: string; target?: string }> {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is { expression?: unknown; target?: unknown } => Boolean(item) && typeof item === 'object')
+    .map((item) => ({
+      expression: typeof item.expression === 'string' ? item.expression : '',
+      target: typeof item.target === 'string' ? item.target : undefined,
+    }));
+}
+
+function isActionConfig(value: unknown): value is ApprovalActionConfig {
+  return value !== null && typeof value === 'object' && 'code' in value;
+}
+
+function approvalStatusOptions() {
+  return [
+    { value: 'PENDING', label: '待审批' },
+    { value: 'APPROVED', label: '已通过' },
+    { value: 'REJECTED', label: '已驳回' },
+  ];
 }
 
 function normalizeDefinition(value: unknown): WorkflowDefinition {

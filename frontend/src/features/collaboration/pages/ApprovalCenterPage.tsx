@@ -17,7 +17,7 @@ import {
   type ActionType,
 } from '@ant-design/pro-components';
 import { Avatar, Button, Card, Col, Descriptions, Drawer, Input, Modal, Row, Skeleton, Space, Statistic, Steps, Tag, Timeline, Typography} from 'antd';
-import { message, notification } from '../../../utils/message';
+import { message, notification, requestErrorMessage } from '../../../utils/message';
 import { useEffect, useRef, useState } from 'react';
 import {
   actionApproval,
@@ -35,6 +35,7 @@ import {
   requiresApprovalComment,
   type ApprovalAction,
 } from '../approvalActions';
+import { buildApprovalProgressSteps } from '../approvalProgress';
 import { operationColumnProps } from '../../../utils/tableColumns';
 
 const { Text, Title } = Typography;
@@ -178,7 +179,9 @@ export function ApprovalCenterPage() {
       setActionComment('');
       instanceRef.current?.reload();
       if (detailVisible && selectedInstance?.id === actionID) {
-        void getApprovalInstance(actionID).then(setSelectedInstance);
+        void getApprovalInstance(actionID).then((data) => {
+          setSelectedInstance((prev) => (prev?.id === actionID ? data : prev));
+        });
       }
     } catch (err: unknown) {
       const msg = requestErrorMessage(err, '审批处理失败');
@@ -203,11 +206,16 @@ export function ApprovalCenterPage() {
     }
   }
 
-  const currentStep = selectedInstance?.current_step || 0;
+  const approvalNodeSteps = selectedInstance?.nodes?.filter((node) => node.node_type === 'approval' && node.status !== 'WAITING') ?? [];
+  const approvalProgressSteps = buildApprovalProgressSteps(approvalNodeSteps);
+  const runningNodeIndex = approvalNodeSteps.findIndex((node) => node.status === 'RUNNING');
+  const currentStep = runningNodeIndex >= 0 ? runningNodeIndex : approvalNodeSteps.length > 0 ? approvalNodeSteps.length - 1 : selectedInstance?.current_step || 0;
   const selectedWorkflow = selectedInstance
     ? workflows.find((item) => item.id === selectedInstance.workflow_definition_id)
     : undefined;
-  const approvalStepTitles = selectedWorkflow ? resolveApprovalStepTitles(selectedWorkflow) : [];
+  const approvalStepTitles = approvalProgressSteps.length
+    ? approvalProgressSteps.map((step) => step.title)
+    : selectedWorkflow ? resolveApprovalStepTitles(selectedWorkflow) : [];
 
   return (
     <div style={{ padding: '0 0 24px' }}>
@@ -240,6 +248,7 @@ export function ApprovalCenterPage() {
         actionRef={instanceRef}
         rowKey="id"
         columns={instanceColumns}
+        scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           <Permission code="approval:submit" key="submit">
             <Button type="primary" icon={<SendOutlined />} onClick={() => setSubmitOpen(true)}>
@@ -263,7 +272,6 @@ export function ApprovalCenterPage() {
         }}
         search={{ labelWidth: 'auto', defaultCollapsed: true }}
         options={{ reload: true, density: true }}
-        scroll={{ x: 'max-content' }}
       />
 
       <Drawer
@@ -291,6 +299,11 @@ export function ApprovalCenterPage() {
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="提交时间">{selectedInstance.created_at}</Descriptions.Item>
+              <Descriptions.Item label="表单数据" span={2}>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {JSON.stringify(selectedInstance.form_data ?? {}, null, 2)}
+                </pre>
+              </Descriptions.Item>
             </Descriptions>
 
             <Title level={5}>审批进度</Title>
@@ -406,6 +419,7 @@ function buildApprovalTimelineItems(instance: ApprovalInstanceRow) {
 
   for (const action of instance.actions ?? []) {
     const isApprove = action.action === 'APPROVE';
+    const nodeText = action.from_node_key ? `${action.from_node_key}${action.to_node_key ? ` -> ${action.to_node_key}` : ''}` : '';
     items.push({
       color: isApprove ? 'blue' : 'red',
       children: (
@@ -414,6 +428,7 @@ function buildApprovalTimelineItems(instance: ApprovalInstanceRow) {
             <Text strong>{action.approver}</Text> {isApprove ? '通过了' : '驳回了'}第 {action.step_index + 1} 步审批{' '}
             <Text type="secondary">{action.created_at}</Text>
           </span>
+          {nodeText ? <Text type="secondary">{nodeText}</Text> : null}
           {action.comment ? <Text type="secondary">{action.comment}</Text> : null}
         </Space>
       ),
@@ -423,7 +438,4 @@ function buildApprovalTimelineItems(instance: ApprovalInstanceRow) {
   return items;
 }
 
-function requestErrorMessage(err: unknown, fallback: string) {
-  const response = (err as { response?: { data?: { message?: string } } }).response;
-  return response?.data?.message || fallback;
-}
+

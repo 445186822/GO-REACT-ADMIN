@@ -1,8 +1,8 @@
 package config
 
-import "os"
 import (
 	"bufio"
+	"os"
 	"strings"
 )
 
@@ -16,6 +16,14 @@ type Config struct {
 	AllowedOrigin        string
 	InitialAdminPassword string
 	UploadDir            string
+	AutoMigrate          bool
+	AutoSeed             bool
+	SchedulerEnabled     bool
+	AIAssistantEndpoint  string
+	AIAssistantAPIKey    string
+	AIStreamBaseURL      string
+	AIStreamAPIKey       string
+	AIStreamModel        string
 }
 
 func Load() Config {
@@ -31,6 +39,14 @@ func Load() Config {
 		AllowedOrigin:        getEnv("ALLOWED_ORIGIN", "http://localhost:5173"),
 		InitialAdminPassword: getEnv("INITIAL_ADMIN_PASSWORD", ""),
 		UploadDir:            getEnv("UPLOAD_DIR", "uploads"),
+		AutoMigrate:          getEnvBool("AUTO_MIGRATE", true),
+		AutoSeed:             getEnvBool("AUTO_SEED", true),
+		SchedulerEnabled:     getEnvBool("SCHEDULER_ENABLED", true),
+		AIAssistantEndpoint:  getEnv("AI_ASSISTANT_ENDPOINT", ""),
+		AIAssistantAPIKey:    getEnv("AI_ASSISTANT_API_KEY", ""),
+		AIStreamBaseURL:      getEnv("AI_STREAM_BASE_URL", "https://api.deepseek.com/anthropic"),
+		AIStreamAPIKey:       firstEnv([]string{"AI_STREAM_API_KEY", "AI_API_KEY", "AI_ASSISTANT_API_KEY"}, ""),
+		AIStreamModel:        getEnv("AI_STREAM_MODEL", "deepseek-v4-flash"),
 	}
 }
 
@@ -65,4 +81,29 @@ func getEnv(key string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func firstEnv(keys []string, fallback string) string {
+	for _, key := range keys {
+		value := os.Getenv(key)
+		if value != "" {
+			return value
+		}
+	}
+	return fallback
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	if value == "" {
+		return fallback
+	}
+	switch value {
+	case "1", "true", "yes", "y", "on":
+		return true
+	case "0", "false", "no", "n", "off":
+		return false
+	default:
+		return fallback
+	}
 }

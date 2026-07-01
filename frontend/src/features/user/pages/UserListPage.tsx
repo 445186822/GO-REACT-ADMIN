@@ -5,6 +5,7 @@ import { message } from '../../../utils/message';
 import { useEffect, useRef, useState } from 'react';
 import { createUser, deleteUser, listUsers, resetUserPassword, updateUser, type UserForm, type UserRow } from '../../../api/users';
 import { listRoles, type RoleRow } from '../../../api/roles';
+import { listDepartments, type DepartmentRow } from '../../../api/departments';
 import { Permission } from '../../../components/Permission';
 import { ExportButton } from '../../../components/ExportButton';
 import { exportExcel } from '../../../utils/exportExcel';
@@ -19,18 +20,20 @@ export function UserListPage() {
   const [newPassword, setNewPassword] = useState('');
   const [resetting, setResetting] = useState(false);
   const [roles, setRoles] = useState<RoleRow[]>([]);
+  const [departments, setDepartments] = useState<DepartmentRow[]>([]);
 
   useEffect(() => {
     listRoles().then(setRoles).catch(() => {});
+    listDepartments().then(setDepartments).catch(() => {});
   }, []);
 
   const columns: ProColumns<UserRow>[] = [
-    { title: '用户名', dataIndex: 'username', copyable: true },
-    { title: '姓名', dataIndex: 'display_name' },
-    { title: '角色', dataIndex: 'roles', search: false },
-    { title: '邮箱', dataIndex: 'email', search: false },
-    { title: '手机', dataIndex: 'phone', search: false },
-    { title: '部门', dataIndex: 'department', search: false },
+    { title: '用户名', dataIndex: 'username', copyable: true, width: 160 },
+    { title: '姓名', dataIndex: 'display_name', width: 160 },
+    { title: '角色', dataIndex: 'roles', search: false, width: 130 },
+    { title: '邮箱', dataIndex: 'email', search: false, width: 170 },
+    { title: '手机', dataIndex: 'phone', search: false, width: 140 },
+    { title: '部门', dataIndex: 'department', search: false, width: 140 },
     {
       title: '状态',
       dataIndex: 'status',
@@ -121,6 +124,7 @@ export function UserListPage() {
   }
 
   const roleOptions = roles.map((r) => ({ label: `${r.name} (${r.code})`, value: r.id }));
+  const departmentOptions = departments.map((d) => ({ label: d.name, value: d.id }));
 
   return (
     <div style={{ padding: '0 0 24px' }}>
@@ -128,6 +132,7 @@ export function UserListPage() {
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
+        scroll={{ x: 'max-content' }}
         search={{ labelWidth: 80 }}
         request={async (params) => {
           const data = await listUsers({
@@ -138,7 +143,6 @@ export function UserListPage() {
           return { data: data.items, total: data.total, success: true };
         }}
         pagination={{ defaultPageSize: 10, showSizeChanger: false }}
-        scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           <ExportButton key="export" onClick={exportUsers}>
             导出 Excel
@@ -177,10 +181,18 @@ export function UserListPage() {
         <ProFormText name="email" label="邮箱" />
         <ProFormText name="phone" label="手机" />
         <ProFormSelect
-          name="role_id"
+          name="department_id"
+          label="部门"
+          options={departmentOptions}
+          placeholder="选择用户部门"
+          allowClear
+        />
+        <ProFormSelect
+          name="role_ids"
           label="角色"
           options={roleOptions}
           placeholder="选择用户角色"
+          mode="multiple"
           allowClear
         />
         <ProFormSelect
