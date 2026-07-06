@@ -1,9 +1,10 @@
-import { ApiOutlined, DatabaseOutlined, HistoryOutlined, InboxOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
-import { Alert, App, AutoComplete, Button, Card, Col, Form, Input, Row, Space, Statistic, Switch, Table, Tag, Typography } from 'antd';
+import { ApiOutlined, DatabaseOutlined, DeleteOutlined, DownOutlined, HistoryOutlined, InboxOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
+import { Alert, App, AutoComplete, Button, Card, Col, Form, Input, Popconfirm, Row, Space, Statistic, Switch, Table, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import {
   consumeRabbitMQMessage,
   declareRabbitMQQueue,
+  deleteRabbitMQQueue,
   getRabbitMQConcepts,
   listRabbitMQExchanges,
   listRabbitMQQueues,
@@ -14,7 +15,7 @@ import {
   type RabbitMQQueueRow,
   type StepLog,
 } from '../../../api/queueLab';
-import { applyRabbitMQQueueState, mergeConcepts, rabbitMQConcepts, rabbitMQHistoryNote, toQueueSelectOptions } from '../queueLabView';
+import { applyRabbitMQQueueState, mergeConcepts, rabbitMQConcepts, rabbitMQHistoryNote, rabbitMQQueueListNote, removeRabbitMQQueueState, toQueueSelectOptions } from '../queueLabView';
 import { ConceptPanel, OperationHistory, OperationLogs, type HistoryEntry } from './QueueLabParts';
 
 const historyKey = 'queue-lab:rabbitmq-history';
@@ -35,6 +36,7 @@ export function RabbitMQLabPage() {
   const [exchanges, setExchanges] = useState<RabbitMQExchangeRow[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory(historyKey));
   const [loading, setLoading] = useState('');
+  const [queueOpen, setQueueOpen] = useState(false);
 
   useEffect(() => {
     getRabbitMQConcepts().then((data) => setConcepts(mergeConcepts(rabbitMQConcepts, data))).catch(() => setConcepts(rabbitMQConcepts));
@@ -129,8 +131,28 @@ export function RabbitMQLabPage() {
     }
   }
 
+  async function handleDeleteQueue(queue: string) {
+    setLoading(`delete-queue:${queue}`);
+    try {
+      const res = await deleteRabbitMQQueue(queue);
+      setLogs(res.logs);
+      if (res.result.deleted) {
+        setQueues((prev) => removeRabbitMQQueueState(prev, queue));
+        if (form.getFieldValue('queue') === queue) {
+          form.setFieldValue('queue', '');
+        }
+      }
+      remember('删除 RabbitMQ queue', `${queue}，删除时包含 ${res.result.message_count ?? 0} 条堆积消息`);
+      message.success(res.result.deleted ? '队列已删除' : '队列删除未成功');
+      await refreshQueues(false, false, false);
+    } finally {
+      setLoading('');
+    }
+  }
+
   const totalMessages = queues.reduce((sum, item) => sum + item.messages, 0);
   const totalConsumers = queues.reduce((sum, item) => sum + item.consumers, 0);
+  const queueOptions = toQueueSelectOptions(queues);
 
   return (
     <Row gutter={[16, 16]}>
@@ -144,10 +166,13 @@ export function RabbitMQLabPage() {
             extra={<Button icon={<ReloadOutlined />} loading={loading === 'queues'} onClick={() => void refreshQueues()}>刷新队列</Button>}
           >
             <Row gutter={16} style={{ marginBottom: 12 }}>
-              <Col span={8}><Statistic title="Queue" value={queues.length} /></Col>
-              <Col span={8}><Statistic title="堆积消息" value={totalMessages} /></Col>
-              <Col span={8}><Statistic title="消费者" value={totalConsumers} /></Col>
+              <Col span={8}><Statistic title="队列总数" value={queues.length} /></Col>
+              <Col span={8}><Statistic title="堆积消息总数" value={totalMessages} /></Col>
+              <Col span={8}><Statistic title="消费者总数" value={totalConsumers} /></Col>
             </Row>
+            <Typography.Paragraph type="secondary" style={{ marginTop: -4, marginBottom: 12 }}>
+              {rabbitMQQueueListNote}
+            </Typography.Paragraph>
             <Table<RabbitMQQueueRow>
               size="small"
               rowKey={(row) => `${row.vhost}:${row.name}`}
@@ -159,6 +184,17 @@ export function RabbitMQLabPage() {
                 { title: 'Messages', dataIndex: 'messages', width: 100 },
                 { title: 'Consumers', dataIndex: 'consumers', width: 110 },
                 { title: 'Durable', dataIndex: 'durable', width: 90, render: (value) => value ? <Tag color="green">是</Tag> : <Tag>否</Tag> },
+                {
+                  title: '操作',
+                  width: 90,
+                  render: (_, row) => (
+                    <Popconfirm title="删除 queue" description={`确认删除 ${row.name}？队列中的未消费消息也会删除。`} onConfirm={() => void handleDeleteQueue(row.name)}>
+                      <Button type="link" danger size="small" icon={<DeleteOutlined />} loading={loading === `delete-queue:${row.name}`}>
+                        删除
+                      </Button>
+                    </Popconfirm>
+                  ),
+                },
               ]}
             />
           </Card>
@@ -203,7 +239,22 @@ export function RabbitMQLabPage() {
           <Card size="small" title={<Space><SendOutlined />操作体验</Space>}>
             <Form form={form} layout="vertical" initialValues={{ queue: 'demo.queue', value: 'hello rabbitmq', ack: true }}>
               <Form.Item name="queue" label="Queue" rules={[{ required: true, message: '请输入 queue' }]}>
-                <AutoComplete options={toQueueSelectOptions(queues)} placeholder="选择已有 queue 或输入新 queue" filterOption />
+                <AutoComplete
+                  allowClear
+                  options={queueOptions}
+                  placeholder="选择已有 queue 或输入新 queue"
+                  filterOption={false}
+                  suffixIcon={<DownOutlined style={{ color: '#98a2b3' }} />}
+                  open={queueOpen && queueOptions.length > 0}
+                  onFocus={() => setQueueOpen(true)}
+                  onClick={() => setQueueOpen(true)}
+                  onSearch={() => setQueueOpen(true)}
+                  onSelect={(value) => {
+                    form.setFieldValue('queue', value);
+                    setQueueOpen(false);
+                  }}
+                  onBlur={() => setQueueOpen(false)}
+                />
               </Form.Item>
               <Button type="primary" icon={<DatabaseOutlined />} loading={loading === 'queue'} onClick={() => void run('queue')}>声明/确认 queue</Button>
 

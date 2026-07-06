@@ -14,6 +14,10 @@ export const kafkaHistoryNote = 'Kafka 的历史由 broker 按 topic/partition/o
 
 export const rabbitMQHistoryNote = 'RabbitMQ 的队列消息被消费者 ack 后通常不保留历史；本页历史记录的是你的体验操作和消费结果。';
 
+export const rabbitMQQueueListNote = '队列总数表示 RabbitMQ broker 当前可见的 queue 数量，包含 demo.queue 以及 TCP/UDP/MQTT 页面自动声明的 iot.* 队列；堆积消息是这些队列当前未 ack 的消息总和。';
+
+export const kafkaTopicListNote = '业务 Topic 表示 Kafka broker 当前可见的非内部 topic 数量；IoT 页面写入 Kafka 时会自动确认或创建 iot.* topic。';
+
 export const historyPageSize = 10;
 
 export const kafkaReadOffsetModes = [
@@ -88,6 +92,18 @@ export function applyRabbitMQQueueState(rows: RabbitMQQueueRow[], state?: Rabbit
     return [state, ...rows];
   }
   return rows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...state } : row));
+}
+
+export function removeKafkaTopicState(rows: KafkaTopicRow[], topic: string): KafkaTopicRow[] {
+  return rows.filter((row) => row.topic !== topic);
+}
+
+export function removeRabbitMQQueueState(rows: RabbitMQQueueRow[], queue: string): RabbitMQQueueRow[] {
+  return rows.filter((row) => row.name !== queue);
+}
+
+export function targetNameForProtocol(protocol: IoTProtocol, targetType: BrokerTargetType) {
+  return targetType === 'kafka' ? `iot.${protocol}.telemetry` : `iot.${protocol}.events`;
 }
 
 export function mergeConcepts(fallback: ConceptData, remote?: ConceptData): ConceptData {

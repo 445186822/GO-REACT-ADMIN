@@ -1,9 +1,10 @@
-import { DatabaseOutlined, HistoryOutlined, InboxOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
-import { Alert, App, AutoComplete, Button, Card, Col, Form, Input, InputNumber, Row, Segmented, Space, Statistic, Table, Tag, Typography } from 'antd';
+import { DatabaseOutlined, DeleteOutlined, DownOutlined, HistoryOutlined, InboxOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons';
+import { Alert, App, AutoComplete, Button, Card, Col, Form, Input, InputNumber, Popconfirm, Row, Segmented, Space, Statistic, Table, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import {
   consumeKafkaMessages,
   createKafkaTopic,
+  deleteKafkaTopic,
   getKafkaConcepts,
   listKafkaTopics,
   sendKafkaMessage,
@@ -12,7 +13,7 @@ import {
   type KafkaTopicRow,
   type StepLog,
 } from '../../../api/queueLab';
-import { kafkaConcepts, kafkaHistoryNote, kafkaReadOffsetModes, mergeConcepts, toTopicSelectOptions } from '../queueLabView';
+import { kafkaConcepts, kafkaHistoryNote, kafkaReadOffsetModes, kafkaTopicListNote, mergeConcepts, removeKafkaTopicState, toTopicSelectOptions } from '../queueLabView';
 import { ConceptPanel, OperationHistory, OperationLogs, type HistoryEntry } from './QueueLabParts';
 
 const historyKey = 'queue-lab:kafka-history';
@@ -36,6 +37,7 @@ export function KafkaLabPage() {
   const [topics, setTopics] = useState<KafkaTopicRow[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory(historyKey));
   const [loading, setLoading] = useState('');
+  const [topicOpen, setTopicOpen] = useState(false);
   const offsetMode = Form.useWatch('offsetMode', form);
 
   useEffect(() => {
@@ -110,8 +112,28 @@ export function KafkaLabPage() {
     }
   }
 
+  async function handleDeleteTopic(topic: string) {
+    setLoading(`delete-topic:${topic}`);
+    try {
+      const res = await deleteKafkaTopic(topic);
+      setLogs(res.logs);
+      if (res.result.deleted) {
+        setTopics((prev) => removeKafkaTopicState(prev, topic));
+        if (form.getFieldValue('topic') === topic) {
+          form.setFieldValue('topic', '');
+        }
+      }
+      remember('删除 Kafka topic', `${topic}，${res.result.deleted ? '已删除' : '删除未成功'}`);
+      message.success(res.result.deleted ? 'topic 已删除' : 'topic 删除未成功');
+      await refreshTopics(false, false, false);
+    } finally {
+      setLoading('');
+    }
+  }
+
   const userTopicCount = topics.filter((item) => !item.internal).length;
   const totalMessages = topics.reduce((sum, item) => sum + Math.max(item.message_count, 0), 0);
+  const topicOptions = toTopicSelectOptions(topics);
 
   return (
     <Row gutter={[16, 16]}>
@@ -125,9 +147,12 @@ export function KafkaLabPage() {
             extra={<Button icon={<ReloadOutlined />} loading={loading === 'topics'} onClick={() => void refreshTopics()}>刷新</Button>}
           >
             <Row gutter={16} style={{ marginBottom: 12 }}>
-              <Col span={12}><Statistic title="业务 Topic" value={userTopicCount} /></Col>
-              <Col span={12}><Statistic title="估算消息数" value={totalMessages} /></Col>
+              <Col span={12}><Statistic title="业务 Topic 总数" value={userTopicCount} /></Col>
+              <Col span={12}><Statistic title="估算消息总数" value={totalMessages} /></Col>
             </Row>
+            <Typography.Paragraph type="secondary" style={{ marginTop: -4, marginBottom: 12 }}>
+              {kafkaTopicListNote}
+            </Typography.Paragraph>
             <Table<KafkaTopicRow>
               size="small"
               rowKey={(row) => row.topic}
@@ -139,6 +164,17 @@ export function KafkaLabPage() {
                 { title: 'Offset 范围', width: 160, render: (_, row) => row.first_offset >= 0 ? `${row.first_offset} - ${row.last_offset}` : '-' },
                 { title: '消息数', dataIndex: 'message_count', width: 90 },
                 { title: 'Leader', dataIndex: 'leader', width: 150 },
+                {
+                  title: '操作',
+                  width: 90,
+                  render: (_, row) => row.internal ? null : (
+                    <Popconfirm title="删除 topic" description={`确认删除 ${row.topic}？`} onConfirm={() => void handleDeleteTopic(row.topic)}>
+                      <Button type="link" danger size="small" icon={<DeleteOutlined />} loading={loading === `delete-topic:${row.topic}`}>
+                        删除
+                      </Button>
+                    </Popconfirm>
+                  ),
+                },
               ]}
             />
           </Card>
@@ -171,7 +207,22 @@ export function KafkaLabPage() {
               <Row gutter={12}>
                 <Col span={16}>
                   <Form.Item name="topic" label="Topic" rules={[{ required: true, message: '请输入 topic' }]}>
-                    <AutoComplete options={toTopicSelectOptions(topics)} placeholder="选择已有 topic 或输入新 topic" filterOption />
+                    <AutoComplete
+                      allowClear
+                      options={topicOptions}
+                      placeholder="选择已有 topic 或输入新 topic"
+                      filterOption={false}
+                      suffixIcon={<DownOutlined style={{ color: '#98a2b3' }} />}
+                      open={topicOpen && topicOptions.length > 0}
+                      onFocus={() => setTopicOpen(true)}
+                      onClick={() => setTopicOpen(true)}
+                      onSearch={() => setTopicOpen(true)}
+                      onSelect={(value) => {
+                        form.setFieldValue('topic', value);
+                        setTopicOpen(false);
+                      }}
+                      onBlur={() => setTopicOpen(false)}
+                    />
                   </Form.Item>
                 </Col>
                 <Col span={8}>

@@ -10,7 +10,7 @@ import {
   type IoTProtocol,
   type StepLog,
 } from '../../../api/queueLab';
-import { iotProtocolProfiles, mergeConcepts } from '../queueLabView';
+import { iotProtocolProfiles, mergeConcepts, targetNameForProtocol } from '../queueLabView';
 import { ConceptPanel, OperationHistory, OperationLogs, type HistoryEntry } from './QueueLabParts';
 
 type IoTProtocolForm = {
@@ -88,7 +88,7 @@ function IoTProtocolLab({ protocol }: { protocol: IoTProtocol }) {
     form.setFieldValue('target_type', value);
     const currentTarget = form.getFieldValue('target');
     if (!currentTarget || currentTarget === profile.defaultTarget.name || currentTarget.startsWith(`iot.${protocol}.`)) {
-      form.setFieldValue('target', value === 'kafka' ? `iot.${protocol}.telemetry` : `iot.${protocol}.events`);
+      form.setFieldValue('target', targetNameForProtocol(protocol, value));
     }
   }
 

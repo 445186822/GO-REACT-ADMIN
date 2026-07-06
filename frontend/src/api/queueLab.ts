@@ -93,6 +93,11 @@ export async function createKafkaTopic(payload: { topic: string; partitions: num
   return res.data;
 }
 
+export async function deleteKafkaTopic(topic: string) {
+  const res = await http.delete<unknown, { data: OperationResponse<{ deleted: boolean; topic: string }> }>('/queue-lab/kafka/topics', { params: { topic } });
+  return res.data;
+}
+
 export async function sendKafkaMessage(payload: { topic: string; key: string; value: string }) {
   const res = await http.post<unknown, { data: OperationResponse<{ sent: boolean; topic: string; key: string; value: string }> }>('/queue-lab/kafka/messages', payload);
   return res.data;
@@ -120,6 +125,11 @@ export async function listRabbitMQExchanges() {
 
 export async function declareRabbitMQQueue(payload: { queue: string }) {
   const res = await http.post<unknown, { data: OperationResponse<{ queue: string; declared: boolean; messages: number; queue_state?: RabbitMQQueueRow | null }> }>('/queue-lab/rabbitmq/queues', payload);
+  return res.data;
+}
+
+export async function deleteRabbitMQQueue(queue: string) {
+  const res = await http.delete<unknown, { data: OperationResponse<{ deleted: boolean; queue: string; message_count: number }> }>('/queue-lab/rabbitmq/queues', { params: { queue } });
   return res.data;
 }
 

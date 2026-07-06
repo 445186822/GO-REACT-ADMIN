@@ -48,12 +48,14 @@ func (h *Handler) Register(g *echo.Group) {
 	group.GET("/kafka/concepts", h.KafkaConcepts)
 	group.GET("/kafka/topics", h.ListKafkaTopics)
 	group.POST("/kafka/topics", h.CreateKafkaTopic)
+	group.DELETE("/kafka/topics", h.DeleteKafkaTopic)
 	group.POST("/kafka/messages", h.SendKafkaMessage)
 	group.POST("/kafka/consume", h.ConsumeKafkaMessages)
 	group.GET("/rabbitmq/concepts", h.RabbitMQConcepts)
 	group.GET("/rabbitmq/queues", h.ListRabbitMQQueues)
 	group.GET("/rabbitmq/exchanges", h.ListRabbitMQExchanges)
 	group.POST("/rabbitmq/queues", h.DeclareRabbitMQQueue)
+	group.DELETE("/rabbitmq/queues", h.DeleteRabbitMQQueue)
 	group.POST("/rabbitmq/messages", h.SendRabbitMQMessage)
 	group.POST("/rabbitmq/consume", h.ConsumeRabbitMQMessage)
 	group.GET("/iot/:protocol/concepts", h.IoTProtocolConcepts)
@@ -330,6 +332,32 @@ func (h *Handler) CreateKafkaTopic(c echo.Context) error {
 	return response.OK(c, OperationResponse{Logs: logs.items, Result: map[string]any{"topic": topic, "created": true, "partitions": partitions}, Concepts: kafkaConcepts()})
 }
 
+func (h *Handler) DeleteKafkaTopic(c echo.Context) error {
+	topic, err := cleanName(c.QueryParam("topic"), "topic")
+	if err != nil {
+		return err
+	}
+	logs := newStepLogs()
+	logs.add("OK", "读取 KAFKA_BROKERS 配置: "+strings.Join(h.kafkaBrokers, ","))
+
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
+	defer cancel()
+	conn, err := kafka.DialContext(ctx, "tcp", h.firstKafkaBroker())
+	if err != nil {
+		logs.add("ERROR", "连接 Kafka 失败: "+err.Error())
+		return response.OK(c, OperationResponse{Logs: logs.items, Result: map[string]any{"topic": topic, "deleted": false}, Concepts: kafkaConcepts()})
+	}
+	defer conn.Close()
+	logs.add("OK", "已连接 Kafka broker，准备删除 topic: "+topic)
+
+	if err := conn.DeleteTopics(topic); err != nil {
+		logs.add("ERROR", "删除 topic 失败: "+err.Error())
+		return response.OK(c, OperationResponse{Logs: logs.items, Result: map[string]any{"topic": topic, "deleted": false}, Concepts: kafkaConcepts()})
+	}
+	logs.add("OK", "topic 删除请求已提交，broker metadata 可能需要短暂刷新。")
+	return response.OK(c, OperationResponse{Logs: logs.items, Result: map[string]any{"topic": topic, "deleted": true}, Concepts: kafkaConcepts()})
+}
+
 func (h *Handler) SendKafkaMessage(c echo.Context) error {
 	var req KafkaMessageRequest
 	if err := c.Bind(&req); err != nil {
@@ -470,6 +498,27 @@ func (h *Handler) DeclareRabbitMQQueue(c echo.Context) error {
 	logs.add("OK", fmt.Sprintf("已声明队列 %s，当前消息数 %d", queue, declared.Messages))
 	queueState := RabbitMQQueueRow{Name: declared.Name, Vhost: "/", Messages: int64(declared.Messages), Consumers: int64(declared.Consumers), Durable: true}
 	return response.OK(c, OperationResponse{Logs: logs.items, Result: map[string]any{"queue": queue, "declared": true, "messages": declared.Messages, "queue_state": queueState}, Concepts: rabbitMQConcepts()})
+}
+
+func (h *Handler) DeleteRabbitMQQueue(c echo.Context) error {
+	queue, err := cleanName(c.QueryParam("queue"), "queue")
+	if err != nil {
+		return err
+	}
+	logs, conn, ch, err := h.rabbitChannel(c.Request().Context())
+	if err != nil {
+		return response.OK(c, OperationResponse{Logs: logs.items, Result: map[string]any{"queue": queue, "deleted": false}, Concepts: rabbitMQConcepts()})
+	}
+	defer conn.Close()
+	defer ch.Close()
+
+	messageCount, err := ch.QueueDelete(queue, false, false, false)
+	if err != nil {
+		logs.add("ERROR", "删除队列失败: "+err.Error())
+		return response.OK(c, OperationResponse{Logs: logs.items, Result: map[string]any{"queue": queue, "deleted": false}, Concepts: rabbitMQConcepts()})
+	}
+	logs.add("OK", fmt.Sprintf("已删除队列 %s，同时删除未消费消息 %d 条", queue, messageCount))
+	return response.OK(c, OperationResponse{Logs: logs.items, Result: map[string]any{"queue": queue, "deleted": true, "message_count": messageCount}, Concepts: rabbitMQConcepts()})
 }
 
 func (h *Handler) SendRabbitMQMessage(c echo.Context) error {

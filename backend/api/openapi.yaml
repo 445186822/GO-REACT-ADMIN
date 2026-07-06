@@ -861,6 +861,17 @@ paths:
       responses:
         "200":
           description: Topic operation logs and result
+    delete:
+      summary: Delete a Kafka topic for queue lab cleanup
+      parameters:
+        - name: topic
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Topic deletion logs and result
   /queue-lab/kafka/messages:
     post:
       summary: Send a Kafka message for queue lab
@@ -890,6 +901,17 @@ paths:
       responses:
         "200":
           description: Queue operation logs and result
+    delete:
+      summary: Delete a RabbitMQ queue for queue lab cleanup
+      parameters:
+        - name: queue
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Queue deletion logs and result
   /queue-lab/rabbitmq/exchanges:
     get:
       summary: List RabbitMQ exchanges from the management API for queue lab
