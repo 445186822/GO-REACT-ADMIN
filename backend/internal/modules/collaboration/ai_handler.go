@@ -46,6 +46,17 @@ func (h *Handler) Chat(c echo.Context) error {
 		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "messages required")
 	}
 
+	latestMessage := latestUserAIMessage(req.Messages)
+	if latestMessage != "" {
+		reply, handled, err := tryAnswerAIDataQuestion(c.Request().Context(), aiToolDB{db: h.db}, userID, middleware.ActiveRoleCode(c), latestMessage)
+		if err != nil {
+			return err
+		}
+		if handled {
+			return h.streamControlledAIReply(c, userID, req.Messages, reply)
+		}
+	}
+
 	if h.ai.StreamBaseURL == "" || h.ai.StreamModel == "" || h.ai.StreamAPIKey == "" {
 		return response.NewError(http.StatusServiceUnavailable, "AI_NOT_CONFIGURED", "AI服务未配置，请检查 AI_STREAM_BASE_URL、AI_STREAM_MODEL 和 AI_STREAM_API_KEY")
 	}
@@ -132,6 +143,26 @@ func (h *Handler) Chat(c echo.Context) error {
 	// Save history
 	h.saveChatHistory(userID, req.Messages, fullResponse.String(), "")
 
+	return nil
+}
+
+func latestUserAIMessage(messages []ChatMessage) string {
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == "user" {
+			return messages[i].Content
+		}
+	}
+	return ""
+}
+
+func (h *Handler) streamControlledAIReply(c echo.Context, userID int64, messages []ChatMessage, reply string) error {
+	c.Response().Header().Set(echo.HeaderContentType, "text/event-stream")
+	c.Response().WriteHeader(http.StatusOK)
+	chunkBytes, _ := json.Marshal(map[string]string{"delta": reply})
+	fmt.Fprintf(c.Response(), "data: %s\n\n", string(chunkBytes))
+	fmt.Fprintf(c.Response(), "data: [DONE]\n\n")
+	c.Response().Flush()
+	h.saveChatHistory(userID, messages, reply, "")
 	return nil
 }
 

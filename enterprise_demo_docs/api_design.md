@@ -1,6 +1,6 @@
 # API Design
 
-The backend exposes authenticated REST APIs under `/api/v1`. Responses use a unified envelope:
+The backend exposes REST APIs under `/api/v1`. Responses use a unified envelope:
 
 ```json
 {
@@ -10,75 +10,66 @@ The backend exposes authenticated REST APIs under `/api/v1`. Responses use a uni
 }
 ```
 
-Errors use the same envelope with an HTTP status and stable error code.
+Authenticated APIs enforce backend permission codes derived from route and method. Frontend button visibility is only a usability layer; direct API calls still require matching permissions.
 
-Authenticated business APIs enforce backend permission codes derived from the request route and method. Frontend button visibility is only a usability layer; direct API calls still require the matching menu or button permission.
+## Public and Auth
 
-## Public Health
-
-- `GET /health`
-- `GET /api/v1/health`
-
-## Authentication
-
-- `POST /api/v1/auth/login`: login with database-backed user credentials.
+- `GET /health`, `GET /api/v1/health`: health checks.
+- `GET /api/v1/auth/captcha`: slider captcha challenge.
+- `POST /api/v1/auth/captcha/verify`: captcha verification.
+- `POST /api/v1/auth/login`: database-backed login.
 - `POST /api/v1/auth/refresh`: issue a new access token.
-- `GET /api/v1/auth/me`: return current user, permission codes, and menu tree.
+- `GET /api/v1/auth/me`: current user, permission codes, and menu tree.
+- `PUT /api/v1/auth/password`: change current user's password.
 
-## System APIs
+## System and Operations
 
-- `GET /api/v1/users`: paged user list.
-- `POST /api/v1/users`: create user.
-- `PUT /api/v1/users/{id}`: update user.
-- `DELETE /api/v1/users/{id}`: soft delete user.
-- `GET /api/v1/roles`: list roles.
-- `GET /api/v1/menus`: list menus and permission metadata.
-- `GET /api/v1/departments`: list departments.
+- Users: `GET|POST /users`, `PUT|DELETE /users/{id}`, `PUT /users/{id}/reset-password`.
+- Roles: `GET|POST /roles`, `PUT|DELETE /roles/{id}`, `GET|PUT /roles/{id}/menus`.
+- Menus and departments: `GET /menus`, `GET /departments`.
+- Settings: `GET /settings`, `PUT /settings/{key}`.
+- Data dictionary: `/dict/types`, `/dict/types/tree`, `/dict/types/{id}`, `/dict/types/{id}/items`, `/dict/items/{id}`, `/dict/items/batch-sort`.
+- Recycle bin: `GET|DELETE /recycle-bin`, `DELETE /recycle-bin/{id}`, `POST /recycle-bin/{id}/restore`.
+- Scheduler: `/scheduler/tasks`, `/scheduler/tasks/{id}`, `/scheduler/tasks/{id}/toggle`, `/scheduler/tasks/{id}/run`, `/scheduler/tasks/{id}/executions`.
+- Monitor and dashboard: `GET /monitor/overview`, `GET /monitor/db-stats`, `GET /dashboard/stats`.
 
-## Business APIs
+## Business, Files, Audit, and Knowledge
 
-- `GET /api/v1/customers`: paged customer list with data-scope filtering.
-- `POST /api/v1/customers`: create customer.
-- `PUT /api/v1/customers/{id}`: update customer.
-- `DELETE /api/v1/customers/{id}`: soft delete customer.
-- `POST /api/v1/customers/export`: backend-generated `.xlsx` download for authorized customer data.
+- Customers: `GET|POST /customers`, `PUT|DELETE /customers/{id}`, `POST /customers/export`.
+- Files: `GET /files`, `POST /files/upload`, `GET /files/{id}/download`, `DELETE /files/{id}`.
+- Audit logs: `GET /audit-logs`, `GET /audit-logs/{id}`.
+- Knowledge base: `/kb/categories`, `/kb/categories/tree`, `/kb/categories/{id}`, `/kb/articles`, `/kb/articles/{id}`, `/kb/faqs`, `/kb/faqs/{id}`.
 
-## File, Audit, and Settings APIs
+## Collaboration, Workflow, and AI
 
-- `GET /api/v1/files`: paged uploaded file list.
-- `POST /api/v1/files/upload`: upload a file.
-- `GET /api/v1/files/{id}/download`: backend file stream download.
-- `DELETE /api/v1/files/{id}`: soft delete file metadata.
-- `GET /api/v1/audit-logs`: paged persisted audit logs.
-- `GET /api/v1/audit-logs/{id}`: audit log detail.
-- `GET /api/v1/settings`: list system settings, filterable by `group_key` and `keyword`.
-- `PUT /api/v1/settings/{key}`: create or update a setting.
+- Notifications: `/notifications`, `/notifications/unread-count`, `/notifications/{id}/read`, `/notifications/read-all`, `/notifications/ws`.
+- Message templates: `GET|POST /message-templates`, `PUT|DELETE /message-templates/{id}`.
+- Approvals: `GET|POST /approval/instances`, `GET /approval/instances/{id}`, `POST /approval/instances/{id}/action`.
+- Workflows: `GET|POST /workflows`, `PUT|DELETE /workflows/{id}`, `POST /workflows/{id}/run`, `GET /workflows/instances`, `GET /workflows/instances/{id}`.
+- AI assistant: `GET /ai-assistant/messages`, `POST /ai-assistant/chat`.
+- Streaming AI chat: `POST /ai/chat`, `GET /ai/history`.
 
-## Knowledge Base APIs
+## Instant Messaging
 
-- `GET|POST /api/v1/kb/categories`: list or create categories.
-- `DELETE /api/v1/kb/categories/{id}`: delete only when the category has no child categories, articles, or FAQs; otherwise returns `409 KB_CATEGORY_IN_USE`.
-- `GET|POST /api/v1/kb/articles`: paged article list and create. Lists support `keyword`, `category_id`, and `status`.
-- `GET|PUT|DELETE /api/v1/kb/articles/{id}`: article detail, update, and soft delete.
-- `GET|POST /api/v1/kb/faqs`: paged FAQ list and create. Lists support `keyword`, `category_id`, and `status`.
+- `GET|POST /chat/sessions`: list and create sessions.
+- `GET|PUT /chat/sessions/{id}`: session detail and title/status update.
+- `GET|POST /chat/sessions/{id}/messages`: list and send messages.
+- `POST /chat/sessions/{id}/messages/{message_id}/revoke`: revoke a message.
+- `PUT /chat/sessions/{id}/read`: mark a session read.
+- `PUT /chat/sessions/{id}/settings`: update current participant settings.
+- `POST /chat/sessions/{id}/participants`: add participants.
+- `DELETE /chat/sessions/{id}/participants/{user_id}`: remove or leave participant.
+- `GET /chat/users`: search active users for chat.
+- `GET /chat/ws`: chat WebSocket endpoint.
 
-## Collaboration APIs
+## Queue and IoT Protocol Lab
 
-- `GET /api/v1/notifications`: paged notifications.
-- `POST /api/v1/notifications`: create a persisted notification.
-- `GET /api/v1/notifications/unread-count`: current unread count.
-- `PUT /api/v1/notifications/{id}/read`: mark one notification as read.
-- `PUT /api/v1/notifications/read-all`: mark visible notifications as read.
-- `GET /api/v1/notifications/ws`: WebSocket unread/change events using `token` query auth.
-- `GET|POST|PUT|DELETE /api/v1/message-templates`: message template management. Lists support `keyword`, `category`, and `status`.
-- `GET|POST /api/v1/approval/instances`: list and submit approval instances. Submitted instances bind directly to an approval workflow via `workflow_definition_id`; lists support `keyword`, `biz_type`, and `status`.
-- `POST /api/v1/approval/instances/{id}/action`: approve or reject an instance.
-- `GET|POST|PUT|DELETE /api/v1/workflows`: workflow definition management. Lists support `keyword`, `category`, and `status`.
-- `POST /api/v1/workflows/{id}/run`: create a workflow run instance.
-- `GET /api/v1/workflows/instances`: list workflow runs.
-- `GET /api/v1/ai-assistant/messages`: current user's stored AI chat messages.
-- `POST /api/v1/ai-assistant/chat`: forward a message to the configured AI provider and store the reply.
+- Kafka: `/queue-lab/kafka/concepts`, `/queue-lab/kafka/topics`, `/queue-lab/kafka/messages`, `/queue-lab/kafka/consume`.
+- RabbitMQ: `/queue-lab/rabbitmq/concepts`, `/queue-lab/rabbitmq/queues`, `/queue-lab/rabbitmq/exchanges`, `/queue-lab/rabbitmq/messages`, `/queue-lab/rabbitmq/consume`.
+- IoT protocols: `GET /queue-lab/iot/{protocol}/concepts`, `POST /queue-lab/iot/{protocol}/messages`, where `{protocol}` is `tcp`, `udp`, or `mqtt`.
+
+IoT protocol messages are wrapped as JSON events and bridged to a selected Kafka topic or RabbitMQ queue. Kafka topics are confirmed/created before publish; RabbitMQ queues are declared before publish.
 
 ## Runtime Visibility Rule
 
-Only implemented APIs are documented and registered. Do not publish planned modules in OpenAPI until the database, handler, permissions, frontend route, and validation path exist.
+Only implemented APIs are documented and registered. Do not publish planned modules in OpenAPI until database, handler, permission mapping, frontend route, validation, and verification exist.

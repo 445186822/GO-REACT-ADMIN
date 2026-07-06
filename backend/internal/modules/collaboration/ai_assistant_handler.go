@@ -58,15 +58,27 @@ func (h *Handler) ChatAI(c echo.Context) error {
 	if req.Message == "" {
 		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "消息内容不能为空")
 	}
-	endpoint := h.ai.AssistantEndpoint
-	if endpoint == "" {
-		return response.NewError(http.StatusServiceUnavailable, "AI_NOT_CONFIGURED", "AI 服务未配置，请设置 AI_ASSISTANT_ENDPOINT")
-	}
 	userID := middleware.CurrentUserID(c)
 	if _, err := h.db.Exec(c.Request().Context(), `INSERT INTO ai_assistant_messages (user_id, role, content) VALUES ($1,'user',$2)`, userID, req.Message); err != nil {
 		return err
 	}
-	reply, err := callAIEndpoint(c.Request().Context(), endpoint, h.ai.AssistantAPIKey, req.Message)
+
+	reply, handled, err := tryAnswerAIDataQuestion(c.Request().Context(), aiToolDB{db: h.db}, userID, middleware.ActiveRoleCode(c), req.Message)
+	if err != nil {
+		return err
+	}
+	if handled {
+		if _, err := h.db.Exec(c.Request().Context(), `INSERT INTO ai_assistant_messages (user_id, role, content) VALUES ($1,'assistant',$2)`, userID, reply); err != nil {
+			return err
+		}
+		return response.OK(c, map[string]string{"reply": reply})
+	}
+
+	endpoint := h.ai.AssistantEndpoint
+	if endpoint == "" {
+		return response.NewError(http.StatusServiceUnavailable, "AI_NOT_CONFIGURED", "AI 服务未配置，请设置 AI_ASSISTANT_ENDPOINT")
+	}
+	reply, err = callAIEndpoint(c.Request().Context(), endpoint, h.ai.AssistantAPIKey, req.Message)
 	if err != nil {
 		return err
 	}

@@ -28,6 +28,32 @@ func TestLoadReadsAIConfiguration(t *testing.T) {
 	}
 }
 
+func TestLoadReadsQueueLabConfiguration(t *testing.T) {
+	t.Setenv("KAFKA_BROKERS", "kafka-a:9092,kafka-b:9092")
+	t.Setenv("RABBITMQ_URL", "amqp://demo:secret@rabbitmq:5672/")
+	t.Setenv("RABBITMQ_MANAGEMENT_URL", "http://rabbitmq:15672")
+	t.Setenv("RABBITMQ_MANAGEMENT_USER", "demo")
+	t.Setenv("RABBITMQ_MANAGEMENT_PASS", "secret")
+
+	cfg := Load()
+
+	if cfg.KafkaBrokers != "kafka-a:9092,kafka-b:9092" {
+		t.Fatalf("KafkaBrokers = %q", cfg.KafkaBrokers)
+	}
+	if cfg.RabbitMQURL != "amqp://demo:secret@rabbitmq:5672/" {
+		t.Fatalf("RabbitMQURL = %q", cfg.RabbitMQURL)
+	}
+	if cfg.RabbitMQManagementURL != "http://rabbitmq:15672" {
+		t.Fatalf("RabbitMQManagementURL = %q", cfg.RabbitMQManagementURL)
+	}
+	if cfg.RabbitMQManagementUser != "demo" {
+		t.Fatalf("RabbitMQManagementUser = %q", cfg.RabbitMQManagementUser)
+	}
+	if cfg.RabbitMQManagementPass != "secret" {
+		t.Fatalf("RabbitMQManagementPass = %q", cfg.RabbitMQManagementPass)
+	}
+}
+
 func TestLoadReadsRuntimeStartupFlags(t *testing.T) {
 	t.Setenv("AUTO_MIGRATE", "false")
 	t.Setenv("AUTO_SEED", "0")

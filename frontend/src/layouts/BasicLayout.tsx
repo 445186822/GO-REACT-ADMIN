@@ -1,5 +1,6 @@
 import {
   ApartmentOutlined,
+  ApiOutlined,
   AppstoreOutlined,
   AuditOutlined,
   BellOutlined,
@@ -7,6 +8,7 @@ import {
   BranchesOutlined,
   CheckSquareOutlined,
   ClockCircleOutlined,
+  CloudUploadOutlined,
   ContactsOutlined,
   ControlOutlined,
   DashboardOutlined,
@@ -22,11 +24,11 @@ import {
   MenuUnfoldOutlined,
   MessageOutlined,
   ReadOutlined,
+  RadarChartOutlined,
   ReloadOutlined,
   RobotOutlined,
   ScheduleOutlined,
   SettingOutlined,
-  SwapOutlined,
   ShoppingCartOutlined,
   TeamOutlined,
   UserOutlined,
@@ -504,6 +506,9 @@ export function BasicLayout() {
                 </div>
               </Dropdown>
               {activeRole && (
+                <span className="identity-menu-separator" />
+              )}
+              {activeRole && (
                 <Dropdown
                   trigger={['click']}
                   placement="bottomRight"
@@ -513,8 +518,8 @@ export function BasicLayout() {
                     onClick: handleRoleMenuClick,
                   }}
                 >
-                  <button type="button" className="role-switch-btn">
-                    <SwapOutlined />
+                  <button type="button" className="role-menu">
+                    {activeRole.name}
                   </button>
                 </Dropdown>
               )}
@@ -801,6 +806,7 @@ function AppearanceDrawer({ open, onClose }: { open: boolean; onClose: () => voi
 
 const iconMap: Record<string, ReactNode> = {
   ApartmentOutlined: <ApartmentOutlined />,
+  ApiOutlined: <ApiOutlined />,
   AppstoreOutlined: <AppstoreOutlined />,
   AuditOutlined: <AuditOutlined />,
   BellOutlined: <BellOutlined />,
@@ -808,6 +814,7 @@ const iconMap: Record<string, ReactNode> = {
   BranchesOutlined: <BranchesOutlined />,
   CheckSquareOutlined: <CheckSquareOutlined />,
   ClockCircleOutlined: <ClockCircleOutlined />,
+  CloudUploadOutlined: <CloudUploadOutlined />,
   ContactsOutlined: <ContactsOutlined />,
   ControlOutlined: <ControlOutlined />,
   DashboardOutlined: <DashboardOutlined />,
@@ -819,6 +826,7 @@ const iconMap: Record<string, ReactNode> = {
   MenuOutlined: <MenuOutlined />,
   MessageOutlined: <MessageOutlined />,
   ReadOutlined: <ReadOutlined />,
+  RadarChartOutlined: <RadarChartOutlined />,
   RobotOutlined: <RobotOutlined />,
   ScheduleOutlined: <ScheduleOutlined />,
   SettingOutlined: <SettingOutlined />,

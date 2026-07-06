@@ -31,6 +31,12 @@ export const enterpriseRoutes: EnterpriseRoute[] = [
   route('system/recycle-bin', 'recycle:view', () => import('../features/recyclebin/pages/RecycleBinPage').then(named('RecycleBinPage'))),
   route('system/monitor', 'monitor:view', () => import('../features/monitor/pages/SystemMonitorPage').then(named('SystemMonitorPage'))),
   route('system/scheduler', 'scheduler:view', () => import('../features/scheduler/pages/SchedulerPage').then(named('SchedulerPage'))),
+  route('system/architecture', 'architecture:view', () => import('../features/architecture/pages/ArchitecturePage').then(named('ArchitecturePage'))),
+  route('system/queue-lab/kafka', 'queue:kafka', () => import('../features/queuelab/pages/KafkaLabPage').then(named('KafkaLabPage'))),
+  route('system/queue-lab/rabbitmq', 'queue:rabbitmq', () => import('../features/queuelab/pages/RabbitMQLabPage').then(named('RabbitMQLabPage'))),
+  route('system/queue-lab/tcp', 'queue:tcp', () => import('../features/queuelab/pages/IoTProtocolLabPage').then(named('TCPLabPage'))),
+  route('system/queue-lab/udp', 'queue:udp', () => import('../features/queuelab/pages/IoTProtocolLabPage').then(named('UDPLabPage'))),
+  route('system/queue-lab/mqtt', 'queue:mqtt', () => import('../features/queuelab/pages/IoTProtocolLabPage').then(named('MQTTLabPage'))),
   route('knowledge-base', 'kb:view', () => import('../features/knowledgebase/pages/KnowledgeBasePage').then(named('KnowledgeBasePage'))),
 ];
 

@@ -844,6 +844,96 @@ paths:
       responses:
         "200":
           description: AI chat history
+  /queue-lab/kafka/concepts:
+    get:
+      summary: Get Kafka queue lab concepts
+      responses:
+        "200":
+          description: Kafka concepts
+  /queue-lab/kafka/topics:
+    get:
+      summary: List Kafka topics, partitions, and offsets for queue lab
+      responses:
+        "200":
+          description: Kafka topic list with operation logs
+    post:
+      summary: Create or confirm a Kafka topic for queue lab
+      responses:
+        "200":
+          description: Topic operation logs and result
+  /queue-lab/kafka/messages:
+    post:
+      summary: Send a Kafka message for queue lab
+      responses:
+        "200":
+          description: Send operation logs and result
+  /queue-lab/kafka/consume:
+    post:
+      summary: Read Kafka messages by offset for queue lab
+      responses:
+        "200":
+          description: Consume operation logs and messages
+  /queue-lab/rabbitmq/concepts:
+    get:
+      summary: Get RabbitMQ queue lab concepts
+      responses:
+        "200":
+          description: RabbitMQ concepts
+  /queue-lab/rabbitmq/queues:
+    get:
+      summary: List RabbitMQ queues from the management API for queue lab
+      responses:
+        "200":
+          description: RabbitMQ queue list with operation logs
+    post:
+      summary: Declare or confirm a RabbitMQ queue for queue lab
+      responses:
+        "200":
+          description: Queue operation logs and result
+  /queue-lab/rabbitmq/exchanges:
+    get:
+      summary: List RabbitMQ exchanges from the management API for queue lab
+      responses:
+        "200":
+          description: RabbitMQ exchange list with operation logs
+  /queue-lab/rabbitmq/messages:
+    post:
+      summary: Send a RabbitMQ message for queue lab
+      responses:
+        "200":
+          description: Send operation logs and result
+  /queue-lab/rabbitmq/consume:
+    post:
+      summary: Consume one RabbitMQ message for queue lab
+      responses:
+        "200":
+          description: Consume operation logs and message
+  /queue-lab/iot/{protocol}/concepts:
+    get:
+      summary: Get IoT protocol lab concepts for TCP, UDP, or MQTT
+      parameters:
+        - name: protocol
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [tcp, udp, mqtt]
+      responses:
+        "200":
+          description: IoT protocol concepts
+  /queue-lab/iot/{protocol}/messages:
+    post:
+      summary: Simulate an IoT protocol message and bridge it to Kafka or RabbitMQ
+      parameters:
+        - name: protocol
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [tcp, udp, mqtt]
+      responses:
+        "200":
+          description: IoT bridge operation logs and broker delivery result
 components:
   securitySchemes:
     bearerAuth:

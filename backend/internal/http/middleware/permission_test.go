@@ -19,6 +19,21 @@ func TestPermissionForRequestMapsEnterpriseActions(t *testing.T) {
 		{"PUT", "/api/v1/users/12/reset-password", "user:update"},
 		{"GET", "/api/v1/ai/history", "ai:chat"},
 		{"DELETE", "/api/v1/recycle-bin", "recycle:purge"},
+		{"POST", "/api/v1/queue-lab/kafka/topics", "queue:kafka"},
+		{"GET", "/api/v1/queue-lab/kafka/topics", "queue:kafka"},
+		{"POST", "/api/v1/queue-lab/kafka/messages", "queue:kafka"},
+		{"POST", "/api/v1/queue-lab/kafka/consume", "queue:kafka"},
+		{"POST", "/api/v1/queue-lab/rabbitmq/queues", "queue:rabbitmq"},
+		{"GET", "/api/v1/queue-lab/rabbitmq/queues", "queue:rabbitmq"},
+		{"GET", "/api/v1/queue-lab/rabbitmq/exchanges", "queue:rabbitmq"},
+		{"POST", "/api/v1/queue-lab/rabbitmq/messages", "queue:rabbitmq"},
+		{"POST", "/api/v1/queue-lab/rabbitmq/consume", "queue:rabbitmq"},
+		{"GET", "/api/v1/queue-lab/iot/tcp/concepts", "queue:tcp"},
+		{"POST", "/api/v1/queue-lab/iot/tcp/messages", "queue:tcp"},
+		{"GET", "/api/v1/queue-lab/iot/udp/concepts", "queue:udp"},
+		{"POST", "/api/v1/queue-lab/iot/udp/messages", "queue:udp"},
+		{"GET", "/api/v1/queue-lab/iot/mqtt/concepts", "queue:mqtt"},
+		{"POST", "/api/v1/queue-lab/iot/mqtt/messages", "queue:mqtt"},
 	}
 
 	for _, tt := range tests {

@@ -2,11 +2,22 @@
 
 ## Project Structure & Module Organization
 
-This repository is a monorepo. `backend/` contains the Go + Echo API service, migrations, OpenAPI spec, and backend runtime configuration. `frontend/` contains the React + Vite admin app. `enterprise_demo_docs/` contains current product documentation. Root files such as `docker-compose.yml`, `.gitignore`, and `README.md` are shared repository or infrastructure files.
+This repository is a monorepo. `backend/` contains the Go + Echo API service, migrations, OpenAPI spec, and backend runtime configuration. `frontend/` contains the React + Vite admin app. `enterprise_demo_docs/` contains current product documentation. `docs/` contains current engineering notes such as technical debt tracking. Root files such as `docker-compose.yml`, `.gitignore`, and `README.md` are shared repository or infrastructure files.
 
-Do not expose unfinished modules at runtime. Planned features such as orders, tasks, approvals, WebSocket notifications, and AI chat must stay out of backend routes, frontend routes, seed menus, and OpenAPI until fully implemented.
+Do not expose unfinished modules at runtime. Planned features that are not yet fully implemented, such as orders and business task management, must stay out of backend routes, frontend routes, seed menus, OpenAPI, and product documentation until they have real tables, APIs, permissions, UI, and verification.
 
 ## Build, Test, and Development Commands
+
+Start, stop, restart, and check the local development system with the repository script. Do not start backend or frontend dev servers directly unless the user explicitly asks for a one-off manual run.
+
+```bash
+enterprise-demo.bat start
+enterprise-demo.bat stop
+enterprise-demo.bat restart
+enterprise-demo.bat status
+```
+
+The script uses backend port `18080` and frontend port `15173`.
 
 Backend:
 

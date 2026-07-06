@@ -7,46 +7,56 @@ import (
 )
 
 type Config struct {
-	AppName              string
-	AppEnv               string
-	HTTPAddr             string
-	DatabaseURL          string
-	RedisAddr            string
-	JWTSecret            string
-	AllowedOrigin        string
-	InitialAdminPassword string
-	UploadDir            string
-	AutoMigrate          bool
-	AutoSeed             bool
-	SchedulerEnabled     bool
-	AIAssistantEndpoint  string
-	AIAssistantAPIKey    string
-	AIStreamBaseURL      string
-	AIStreamAPIKey       string
-	AIStreamModel        string
+	AppName                string
+	AppEnv                 string
+	HTTPAddr               string
+	DatabaseURL            string
+	RedisAddr              string
+	JWTSecret              string
+	AllowedOrigin          string
+	InitialAdminPassword   string
+	UploadDir              string
+	AutoMigrate            bool
+	AutoSeed               bool
+	SchedulerEnabled       bool
+	AIAssistantEndpoint    string
+	AIAssistantAPIKey      string
+	AIStreamBaseURL        string
+	AIStreamAPIKey         string
+	AIStreamModel          string
+	KafkaBrokers           string
+	RabbitMQURL            string
+	RabbitMQManagementURL  string
+	RabbitMQManagementUser string
+	RabbitMQManagementPass string
 }
 
 func Load() Config {
 	loadDotEnv(".env")
 
 	return Config{
-		AppName:              getEnv("APP_NAME", "Enterprise Demo"),
-		AppEnv:               getEnv("APP_ENV", "development"),
-		HTTPAddr:             getEnv("HTTP_ADDR", ":8080"),
-		DatabaseURL:          getEnv("DATABASE_URL", "postgres://enterprise:enterprise@localhost:5432/enterprise_demo?sslmode=disable"),
-		RedisAddr:            getEnv("REDIS_ADDR", "localhost:6379"),
-		JWTSecret:            getEnv("JWT_SECRET", "change-me-in-production"),
-		AllowedOrigin:        getEnv("ALLOWED_ORIGIN", "http://localhost:5173"),
-		InitialAdminPassword: getEnv("INITIAL_ADMIN_PASSWORD", ""),
-		UploadDir:            getEnv("UPLOAD_DIR", "uploads"),
-		AutoMigrate:          getEnvBool("AUTO_MIGRATE", true),
-		AutoSeed:             getEnvBool("AUTO_SEED", true),
-		SchedulerEnabled:     getEnvBool("SCHEDULER_ENABLED", true),
-		AIAssistantEndpoint:  getEnv("AI_ASSISTANT_ENDPOINT", ""),
-		AIAssistantAPIKey:    getEnv("AI_ASSISTANT_API_KEY", ""),
-		AIStreamBaseURL:      getEnv("AI_STREAM_BASE_URL", "https://api.deepseek.com/anthropic"),
-		AIStreamAPIKey:       firstEnv([]string{"AI_STREAM_API_KEY", "AI_API_KEY", "AI_ASSISTANT_API_KEY"}, ""),
-		AIStreamModel:        getEnv("AI_STREAM_MODEL", "deepseek-v4-flash"),
+		AppName:                getEnv("APP_NAME", "Enterprise Demo"),
+		AppEnv:                 getEnv("APP_ENV", "development"),
+		HTTPAddr:               getEnv("HTTP_ADDR", ":8080"),
+		DatabaseURL:            getEnv("DATABASE_URL", "postgres://enterprise:enterprise@localhost:5432/enterprise_demo?sslmode=disable"),
+		RedisAddr:              getEnv("REDIS_ADDR", "localhost:6379"),
+		JWTSecret:              getEnv("JWT_SECRET", "change-me-in-production"),
+		AllowedOrigin:          getEnv("ALLOWED_ORIGIN", "http://localhost:5173"),
+		InitialAdminPassword:   getEnv("INITIAL_ADMIN_PASSWORD", ""),
+		UploadDir:              getEnv("UPLOAD_DIR", "uploads"),
+		AutoMigrate:            getEnvBool("AUTO_MIGRATE", true),
+		AutoSeed:               getEnvBool("AUTO_SEED", true),
+		SchedulerEnabled:       getEnvBool("SCHEDULER_ENABLED", true),
+		AIAssistantEndpoint:    getEnv("AI_ASSISTANT_ENDPOINT", ""),
+		AIAssistantAPIKey:      getEnv("AI_ASSISTANT_API_KEY", ""),
+		AIStreamBaseURL:        getEnv("AI_STREAM_BASE_URL", "https://api.deepseek.com/anthropic"),
+		AIStreamAPIKey:         firstEnv([]string{"AI_STREAM_API_KEY", "AI_API_KEY", "AI_ASSISTANT_API_KEY"}, ""),
+		AIStreamModel:          getEnv("AI_STREAM_MODEL", "deepseek-v4-flash"),
+		KafkaBrokers:           getEnv("KAFKA_BROKERS", "localhost:9092"),
+		RabbitMQURL:            getEnv("RABBITMQ_URL", "amqp://admin:admin123@localhost:5672/"),
+		RabbitMQManagementURL:  getEnv("RABBITMQ_MANAGEMENT_URL", "http://localhost:15672"),
+		RabbitMQManagementUser: getEnv("RABBITMQ_MANAGEMENT_USER", "admin"),
+		RabbitMQManagementPass: getEnv("RABBITMQ_MANAGEMENT_PASS", "admin123"),
 	}
 }
 

@@ -63,6 +63,16 @@ func PermissionForRequest(method string, rawPath string) string {
 		return schedulerPermission(path, method)
 	case strings.HasPrefix(path, "/monitor"):
 		return "monitor:view"
+	case strings.HasPrefix(path, "/queue-lab/kafka"):
+		return "queue:kafka"
+	case strings.HasPrefix(path, "/queue-lab/rabbitmq"):
+		return "queue:rabbitmq"
+	case strings.HasPrefix(path, "/queue-lab/iot/tcp"):
+		return "queue:tcp"
+	case strings.HasPrefix(path, "/queue-lab/iot/udp"):
+		return "queue:udp"
+	case strings.HasPrefix(path, "/queue-lab/iot/mqtt"):
+		return "queue:mqtt"
 	case strings.HasPrefix(path, "/kb"):
 		if method == http.MethodGet {
 			return "kb:view"

@@ -1,42 +1,59 @@
 # Enterprise Demo
 
-Enterprise Demo is being built as a production-style enterprise admin application. The project must not expose mock pages, mock APIs, canned stream responses, or seeded sample business data as completed functionality.
+Enterprise Demo is a production-style enterprise admin application. It uses a Go + Echo backend, PostgreSQL persistence, Redis-backed runtime features where configured, and a React + Vite + Ant Design frontend.
+
+The project must not expose unfinished modules at runtime. Planned features must stay out of menus, frontend routes, backend routes, OpenAPI, seed data, and completion claims until they have real tables, APIs, permissions, UI, and verification.
 
 ## Current Implemented Scope
 
-- Backend Echo server, configuration, structured logging, request ID, CORS, recovery, and unified responses.
-- PostgreSQL connection, migration runner, and required system metadata initialization.
-- Real JWT login, refresh token, and current-user API backed by `sys_users`.
-- Authenticated APIs for users, roles list, menus, departments, customers, files, audit logs, settings, notifications, message templates, approvals, workflows, and AI assistant messages.
-- WebSocket notification updates backed by persisted notification records.
-- Local file storage with persisted file metadata.
-- Non-GET API audit logging persisted to `sys_audit_logs`.
-- React + TypeScript + Vite + Ant Design admin shell.
-- Login, dashboard, users, roles, menus, departments, customers, collaboration modules, files, audit logs, and settings pages wired to backend APIs.
-- Docker Compose for PostgreSQL and Redis.
+- Backend Echo server with configuration, structured logging, request ID, CORS, recovery, unified responses, and OpenAPI route coverage tests.
+- PostgreSQL migration runner and required system metadata initialization.
+- JWT login, refresh, password change, current-user API, slider captcha, RBAC menus, and route-level permission enforcement.
+- Users, roles, menus, departments, data dictionaries, recycle bin, scheduler, monitor, dashboard, settings, files, audit logs, and customer management.
+- Collaboration modules: notifications, message templates, approvals, workflow definitions/runtime, AI assistant storage/provider forwarding, and streaming AI chat history.
+- Full internal chat module with sessions, participants, messages, attachments, read state, recall, settings, member management, and WebSocket updates.
+- Message and protocol experience pages: Kafka, RabbitMQ, TCP, UDP, and MQTT. IoT protocol messages can be bridged into Kafka topics or RabbitMQ queues for consumption.
+- React + TypeScript + Vite + Ant Design admin shell with lazy routes, tabbed workspace, theme controls, permission wrappers, and error boundary.
+- Docker Compose infrastructure for PostgreSQL and Redis.
 
-## No Mock Policy
+## Development Commands
 
-- Do not add placeholder pages to the menu or router.
-- Do not return canned data from backend endpoints.
-- Do not seed sample business data.
-- Do not hardcode demo passwords in source code.
-- Keep unfinished modules out of menus, routes, OpenAPI completion lists, and README completion claims.
+Use the repository script for normal local development. It uses backend port `18080` and frontend port `15173`.
 
-## Repository Layout
+```bash
+enterprise-demo.bat start
+enterprise-demo.bat stop
+enterprise-demo.bat restart
+enterprise-demo.bat status
+```
 
-This repository is organized as a monorepo:
+The script expects PostgreSQL on `5432`, Redis on `6379`, Go, npm, and installed frontend dependencies.
 
-- `backend/`: Go + Echo API service, migrations, OpenAPI, and backend runtime configuration.
-- `frontend/`: React + Vite admin app and frontend build configuration.
-- `enterprise_demo_docs/`: current product documentation for API, database, and frontend behavior.
-- `docker-compose.yml`: shared local infrastructure for PostgreSQL and Redis.
+Start infrastructure:
 
-Root-level files are shared repository or infrastructure files. Backend runtime environment files live under `backend/`.
+```bash
+docker compose up -d
+```
+
+Backend verification:
+
+```bash
+cd backend
+go mod tidy
+go test ./...
+```
+
+Frontend verification:
+
+```bash
+cd frontend
+npm install
+npm run build
+```
 
 ## Environment
 
-Copy `backend/.env.example` to `backend/.env` and set required secrets before first startup.
+Copy `backend/.env.example` to `backend/.env` and set secrets before first startup.
 
 ```bash
 INITIAL_ADMIN_PASSWORD=<set-a-real-initial-admin-password>
@@ -45,57 +62,20 @@ JWT_SECRET=<set-a-long-random-secret>
 
 `INITIAL_ADMIN_PASSWORD` is only used when the `admin` account does not yet exist. Existing admin passwords are not overwritten by startup.
 
-## Start Infrastructure
+Queue/protocol labs require Kafka and RabbitMQ configuration in `backend/.env` when those pages are used.
 
-```bash
-docker compose up -d
-```
+## Repository Layout
 
-## Start Backend
+- `backend/`: Go + Echo API service, migrations, OpenAPI, and backend runtime configuration.
+- `frontend/`: React + Vite admin app.
+- `enterprise_demo_docs/`: current product documentation for API, database, and frontend behavior.
+- `docs/`: engineering notes that are still current, including technical debt tracking.
+- `docker-compose.yml`: local PostgreSQL and Redis infrastructure.
 
-```bash
-cd backend
-copy .env.example .env
-go mod tidy
-go run ./cmd/api
-```
+## No Mock Policy
 
-Backend default address:
-
-```text
-http://localhost:8080
-```
-
-Health checks:
-
-```text
-GET http://localhost:8080/health
-GET http://localhost:8080/api/v1/health
-```
-
-## Start Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend default address:
-
-```text
-http://localhost:5173
-```
-
-Login with the real `admin` account and the password configured by `INITIAL_ADMIN_PASSWORD` during first initialization.
-
-## Extension Rule
-
-Additional modules such as orders and tasks may be added later. They must not be exposed in routes, menus, OpenAPI, or product documentation until they have real tables, APIs, frontend pages, permissions, and verification.
-
-AI assistant chat requires a real backend integration endpoint:
-
-```bash
-AI_ASSISTANT_ENDPOINT=<https endpoint returning {"reply":"..."} >
-AI_ASSISTANT_API_KEY=<optional bearer token>
-```
+- Do not add placeholder pages to menus or routes.
+- Do not return canned data from backend endpoints.
+- Do not seed fake business records as completed functionality.
+- Do not hardcode demo passwords or real secrets in source code.
+- Keep unfinished modules out of runtime visibility and documentation.

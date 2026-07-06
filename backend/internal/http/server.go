@@ -20,6 +20,7 @@ import (
 	"enterprise-demo/backend/internal/modules/knowledgebase"
 	"enterprise-demo/backend/internal/modules/menu"
 	"enterprise-demo/backend/internal/modules/monitor"
+	"enterprise-demo/backend/internal/modules/queuelab"
 	"enterprise-demo/backend/internal/modules/recyclebin"
 	"enterprise-demo/backend/internal/modules/role"
 	"enterprise-demo/backend/internal/modules/scheduler"
@@ -73,6 +74,7 @@ func NewServer(cfg config.Config, log *slog.Logger, db *pgxpool.Pool) *echo.Echo
 	recyclebin.NewHandler(db, cfg.JWTSecret).Register(api)
 	dashboard.NewHandler(db, cfg.JWTSecret).Register(api)
 	monitor.NewHandler(db, cfg.JWTSecret).Register(api)
+	queuelab.NewHandler(db, cfg.JWTSecret, cfg.KafkaBrokers, cfg.RabbitMQURL, cfg.RabbitMQManagementURL, cfg.RabbitMQManagementUser, cfg.RabbitMQManagementPass).Register(api)
 	scheduler.NewHandler(db, cfg.JWTSecret).Register(api)
 	knowledgebase.NewHandler(db, cfg.JWTSecret).Register(api)
 
