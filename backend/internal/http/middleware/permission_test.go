@@ -19,6 +19,7 @@ func TestPermissionForRequestMapsEnterpriseActions(t *testing.T) {
 		{"PUT", "/api/v1/users/12/reset-password", "user:update"},
 		{"GET", "/api/v1/ai/history", "ai:chat"},
 		{"DELETE", "/api/v1/recycle-bin", "recycle:purge"},
+		{"POST", "/api/v1/customers/import", "customer:create"},
 		{"POST", "/api/v1/queue-lab/kafka/topics", "queue:kafka"},
 		{"DELETE", "/api/v1/queue-lab/kafka/topics", "queue:kafka"},
 		{"GET", "/api/v1/queue-lab/kafka/topics", "queue:kafka"},

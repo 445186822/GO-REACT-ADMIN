@@ -33,6 +33,8 @@ func PermissionForRequest(method string, rawPath string) string {
 		return permissionByMethod(method, "customer:view", "customer:create", "", "")
 	case path == "/customers/export":
 		return "customer:view"
+	case path == "/customers/import":
+		return "customer:create"
 	case path == "/customers/:id":
 		return permissionByMethod(method, "", "", "customer:update", "customer:delete")
 	case path == "/files":

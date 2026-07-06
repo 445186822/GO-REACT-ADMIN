@@ -2,13 +2,17 @@ package customer
 
 import (
 	"fmt"
+	"io"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"enterprise-demo/backend/internal/exportxlsx"
 	"enterprise-demo/backend/internal/http/middleware"
 	"enterprise-demo/backend/internal/http/response"
+	"enterprise-demo/backend/internal/importxlsx"
 	"enterprise-demo/backend/internal/modules/recyclebin"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,6 +33,7 @@ func (h *Handler) Register(g *echo.Group) {
 	group.GET("", h.List)
 	group.POST("", h.Create)
 	group.POST("/export", h.Export)
+	group.POST("/import", h.Import)
 	group.PUT("/:id", h.Update)
 	group.DELETE("/:id", h.Delete)
 }
@@ -158,6 +163,58 @@ LIMIT 10000`, req.Keyword, scope, deptID, userID)
 	filename := fmt.Sprintf("customers_%s.xlsx", time.Now().Format("20060102_150405"))
 	c.Response().Header().Set(echo.HeaderContentDisposition, fmt.Sprintf(`attachment; filename="%s"`, filename))
 	return c.Blob(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", content)
+}
+
+func (h *Handler) Import(c echo.Context) error {
+	userID := middleware.CurrentUserID(c)
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "file is required")
+	}
+	if strings.ToLower(filepath.Ext(fileHeader.Filename)) != ".xlsx" {
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "only .xlsx files are supported")
+	}
+	file, err := fileHeader.Open()
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	content, err := io.ReadAll(io.LimitReader(file, 10<<20))
+	if err != nil {
+		return err
+	}
+	rows, err := importxlsx.Read(content)
+	if err != nil {
+		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "invalid xlsx file")
+	}
+	customers, failures := parseCustomerImportRows(rows)
+	result := ImportResult{Success: len(customers), Failed: len(failures), Errors: failures}
+	result.Total = result.Success + result.Failed
+	if len(customers) == 0 {
+		return response.OK(c, result)
+	}
+
+	var deptID int64
+	if err := h.db.QueryRow(c.Request().Context(), `SELECT department_id FROM sys_users WHERE id = $1`, userID).Scan(&deptID); err != nil {
+		return err
+	}
+	tx, err := h.db.Begin(c.Request().Context())
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(c.Request().Context())
+	for _, customer := range customers {
+		if _, err := tx.Exec(c.Request().Context(), `
+INSERT INTO biz_customers (name, level, phone, email, owner_id, department_id, status, remark)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+			customer.Name, customer.Level, customer.Phone, customer.Email, userID, deptID, customer.Status, customer.Remark); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(c.Request().Context()); err != nil {
+		return err
+	}
+	return response.OK(c, result)
 }
 
 func (h *Handler) Create(c echo.Context) error {

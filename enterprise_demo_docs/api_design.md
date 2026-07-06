@@ -35,7 +35,7 @@ Authenticated APIs enforce backend permission codes derived from route and metho
 
 ## Business, Files, Audit, and Knowledge
 
-- Customers: `GET|POST /customers`, `PUT|DELETE /customers/{id}`, `POST /customers/export`.
+- Customers: `GET|POST /customers`, `PUT|DELETE /customers/{id}`, `POST /customers/export`, `POST /customers/import`.
 - Files: `GET /files`, `POST /files/upload`, `GET /files/{id}/download`, `DELETE /files/{id}`.
 - Audit logs: `GET /audit-logs`, `GET /audit-logs/{id}`.
 - Knowledge base: `/kb/categories`, `/kb/categories/tree`, `/kb/categories/{id}`, `/kb/articles`, `/kb/articles/{id}`, `/kb/faqs`, `/kb/faqs/{id}`.

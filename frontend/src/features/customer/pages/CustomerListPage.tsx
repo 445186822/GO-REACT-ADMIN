@@ -1,4 +1,4 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
 import {
   ModalForm,
   ProColumns,
@@ -8,13 +8,14 @@ import {
   ProTable,
   type ActionType,
 } from '@ant-design/pro-components';
-import { App, Button, Space, Tag, Tooltip } from 'antd';
+import { App, Button, Space, Tag, Tooltip, Upload } from 'antd';
 import { message } from '../../../utils/message';
 import { useRef, useState } from 'react';
 import {
   createCustomer,
   deleteCustomer,
   exportCustomers,
+  importCustomers,
   listCustomers,
   updateCustomer,
   type CustomerForm,
@@ -23,6 +24,7 @@ import {
 import { BackendDownloadButton } from '../../../components/BackendDownloadButton';
 import { Permission } from '../../../components/Permission';
 import { operationColumnProps } from '../../../utils/tableColumns';
+import { customerImportFailureDetail, customerImportSummary } from '../customerImportView';
 
 export function CustomerListPage() {
   const { modal } = App.useApp();
@@ -30,6 +32,7 @@ export function CustomerListPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<CustomerRow | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [importing, setImporting] = useState(false);
 
   const columns: ProColumns<CustomerRow>[] = [
     { title: '客户名称', dataIndex: 'name', copyable: true, width: 160 },
@@ -117,6 +120,22 @@ export function CustomerListPage() {
     message.success('客户 Excel 已生成');
   }
 
+  async function handleImportCustomers(file: File) {
+    setImporting(true);
+    try {
+      const result = await importCustomers(file);
+      const detail = customerImportFailureDetail(result);
+      if (result.failed > 0) {
+        message.warning(detail ? `${customerImportSummary(result)}\n${detail}` : customerImportSummary(result), 8);
+      } else {
+        message.success(customerImportSummary(result));
+      }
+      actionRef.current?.reload();
+    } finally {
+      setImporting(false);
+    }
+  }
+
   return (
     <div style={{ padding: '0 0 24px' }}>
       <ProTable<CustomerRow>
@@ -170,6 +189,20 @@ export function CustomerListPage() {
           <BackendDownloadButton key="export" onClick={handleExportCustomers}>
             导出 Excel
           </BackendDownloadButton>,
+          <Permission code="customer:create" key="import">
+            <Upload
+              accept=".xlsx"
+              showUploadList={false}
+              beforeUpload={(file) => {
+                void handleImportCustomers(file);
+                return false;
+              }}
+            >
+              <Button icon={<UploadOutlined />} loading={importing}>
+                导入 Excel
+              </Button>
+            </Upload>
+          </Permission>,
           <Permission code="customer:create" key="create">
             <Button
               type="primary"

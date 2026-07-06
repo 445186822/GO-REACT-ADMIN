@@ -21,7 +21,7 @@ Do not add placeholder routes. If a module is not backed by real database tables
 - `/system/monitor`: system and database monitor overview.
 - `/system/scheduler`: task CRUD, enable/disable, manual run, and execution history.
 - `/system/architecture`: architecture overview page.
-- `/business/customers`: customer CRUD, data-scope API integration, and backend XLSX export.
+- `/business/customers`: customer CRUD, data-scope API integration, backend XLSX export, and XLSX import.
 - `/collaboration/todos`: current user's actionable workflow approval tasks.
 - `/collaboration/notifications`: persisted notification list, unread state, read actions, create notification, and WebSocket unread updates.
 - `/collaboration/message-templates`: message template CRUD with JSON variables.

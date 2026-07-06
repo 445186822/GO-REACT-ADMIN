@@ -169,6 +169,24 @@ paths:
               schema:
                 type: string
                 format: binary
+  /customers/import:
+    post:
+      summary: Import customers from an XLSX file
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Import result with success and row-level failures
   /customers/{id}:
     put:
       summary: Update customer

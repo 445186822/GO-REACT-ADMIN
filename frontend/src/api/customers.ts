@@ -22,6 +22,18 @@ export type CustomerForm = {
   remark?: string;
 };
 
+export type CustomerImportFailure = {
+  row: number;
+  reason: string;
+};
+
+export type CustomerImportResult = {
+  total: number;
+  success: number;
+  failed: number;
+  errors: CustomerImportFailure[];
+};
+
 export async function listCustomers(params: { keyword?: string; page?: number; page_size?: number }): Promise<Page<CustomerRow>> {
   const res = await http.get<unknown, { data: Page<CustomerRow> }>('/customers', { params });
   return res.data;
@@ -37,6 +49,13 @@ export async function exportCustomers(): Promise<void> {
   anchor.click();
   anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export async function importCustomers(file: File): Promise<CustomerImportResult> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await http.post<unknown, { data: CustomerImportResult }>('/customers/import', form);
+  return res.data;
 }
 
 export async function createCustomer(payload: CustomerForm): Promise<{ id: number }> {
