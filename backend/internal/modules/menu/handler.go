@@ -7,6 +7,7 @@ import (
 
 	"enterprise-demo/backend/internal/http/middleware"
 	"enterprise-demo/backend/internal/http/response"
+	"enterprise-demo/backend/internal/util"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
@@ -154,9 +155,9 @@ func normalizeMenuForm(form *Form) error {
 	form.Type = strings.ToLower(strings.TrimSpace(form.Type))
 	form.Code = strings.TrimSpace(form.Code)
 	form.Name = strings.TrimSpace(form.Name)
-	form.Path = trimStringPtr(form.Path)
-	form.Component = trimStringPtr(form.Component)
-	form.Icon = trimStringPtr(form.Icon)
+	form.Path = util.TrimStringPtr(form.Path)
+	form.Component = util.TrimStringPtr(form.Component)
+	form.Icon = util.TrimStringPtr(form.Icon)
 	if form.Type == "" {
 		form.Type = "page"
 	}
@@ -170,17 +171,6 @@ func normalizeMenuForm(form *Form) error {
 		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "name is required")
 	}
 	return nil
-}
-
-func trimStringPtr(value *string) *string {
-	if value == nil {
-		return nil
-	}
-	trimmed := strings.TrimSpace(*value)
-	if trimmed == "" {
-		return nil
-	}
-	return &trimmed
 }
 
 func (h *Handler) ensureParentExists(c echo.Context, parentID *int64, selfID int64) error {

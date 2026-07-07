@@ -8,7 +8,7 @@ import (
 	"enterprise-demo/backend/internal/http/middleware"
 	"enterprise-demo/backend/internal/http/response"
 	"enterprise-demo/backend/internal/modules/auditlog"
-	authmodule "enterprise-demo/backend/internal/modules/auth"
+	"enterprise-demo/backend/internal/modules/auth"
 	"enterprise-demo/backend/internal/modules/chat"
 	"enterprise-demo/backend/internal/modules/collaboration"
 	"enterprise-demo/backend/internal/modules/complexform"

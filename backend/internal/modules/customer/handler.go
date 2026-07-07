@@ -58,7 +58,7 @@ type ExportRequest struct {
 func (h *Handler) List(c echo.Context) error {
 	userID := middleware.CurrentUserID(c)
 	keyword := c.QueryParam("keyword")
-	page, pageSize := pagination(c)
+	page, pageSize := response.PageParams(c, 10000)
 	offset := (page - 1) * pageSize
 	scope, deptID, err := h.dataScope(c, userID)
 	if err != nil {
@@ -320,18 +320,6 @@ WHERE ur.user_id = $1 AND m.code = 'customer:view'`, userID).Scan(&scope); err !
 		return "SELF", deptID, err
 	}
 	return scope, deptID, nil
-}
-
-func pagination(c echo.Context) (int64, int64) {
-	page, _ := strconv.ParseInt(c.QueryParam("page"), 10, 64)
-	pageSize, _ := strconv.ParseInt(c.QueryParam("page_size"), 10, 64)
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 10000 {
-		pageSize = 20
-	}
-	return page, pageSize
 }
 
 func stringValue(value *string) string {

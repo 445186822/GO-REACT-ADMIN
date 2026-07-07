@@ -146,9 +146,15 @@ func (h *Handler) UpdateCategory(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return err
 	}
-	h.db.Exec(c.Request().Context(),
+	tag, err := h.db.Exec(c.Request().Context(),
 		`UPDATE kb_categories SET name=$2, parent_id=$3, sort_order=$4, status=$5, updated_at=now() WHERE id=$1`,
 		id, req.Name, req.ParentID, req.SortOrder, req.Status)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "category not found")
+	}
 	return response.OK(c, map[string]bool{"updated": true})
 }
 
@@ -220,7 +226,7 @@ func (h *Handler) ListArticles(c echo.Context) error {
 	keyword := c.QueryParam("keyword")
 	categoryID := c.QueryParam("category_id")
 	status := c.QueryParam("status")
-	page, pageSize := pagination(c)
+	page, pageSize := response.PageParams(c, 100)
 	offset := (page - 1) * pageSize
 
 	var total int64
@@ -306,15 +312,27 @@ func (h *Handler) UpdateArticle(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return err
 	}
-	h.db.Exec(c.Request().Context(),
+	tag, err := h.db.Exec(c.Request().Context(),
 		`UPDATE kb_articles SET title=$2, content=$3, category_id=$4, tags=$5, is_pinned=$6, status=$7, updated_at=now() WHERE id=$1`,
 		id, req.Title, req.Content, req.CategoryID, req.Tags, req.IsPinned, req.Status)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "article not found")
+	}
 	return response.OK(c, map[string]bool{"updated": true})
 }
 
 func (h *Handler) DeleteArticle(c echo.Context) error {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	h.db.Exec(c.Request().Context(), `UPDATE kb_articles SET deleted_at = now() WHERE id = $1`, id)
+	tag, err := h.db.Exec(c.Request().Context(), `UPDATE kb_articles SET deleted_at = now() WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "article not found")
+	}
 	return response.OK(c, map[string]bool{"deleted": true})
 }
 
@@ -343,7 +361,7 @@ func (h *Handler) ListFAQs(c echo.Context) error {
 	keyword := c.QueryParam("keyword")
 	categoryID := c.QueryParam("category_id")
 	status := c.QueryParam("status")
-	page, pageSize := pagination(c)
+	page, pageSize := response.PageParams(c, 100)
 	offset := (page - 1) * pageSize
 
 	var total int64
@@ -406,26 +424,27 @@ func (h *Handler) UpdateFAQ(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return err
 	}
-	h.db.Exec(c.Request().Context(),
+	tag, err := h.db.Exec(c.Request().Context(),
 		`UPDATE kb_faqs SET question=$2, answer=$3, category_id=$4, sort_order=$5, status=$6, updated_at=now() WHERE id=$1`,
 		id, req.Question, req.Answer, req.CategoryID, req.SortOrder, req.Status)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "faq not found")
+	}
 	return response.OK(c, map[string]bool{"updated": true})
 }
 
 func (h *Handler) DeleteFAQ(c echo.Context) error {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	h.db.Exec(c.Request().Context(), `UPDATE kb_faqs SET deleted_at = now() WHERE id = $1`, id)
+	tag, err := h.db.Exec(c.Request().Context(), `UPDATE kb_faqs SET deleted_at = now() WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "faq not found")
+	}
 	return response.OK(c, map[string]bool{"deleted": true})
 }
 
-func pagination(c echo.Context) (int64, int64) {
-	page, _ := strconv.ParseInt(c.QueryParam("page"), 10, 64)
-	pageSize, _ := strconv.ParseInt(c.QueryParam("page_size"), 10, 64)
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
-	return page, pageSize
-}

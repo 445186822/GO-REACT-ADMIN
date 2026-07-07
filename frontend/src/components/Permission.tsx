@@ -6,10 +6,11 @@ type PermissionProps = {
   children: ReactNode;
 };
 
+// hasPermission is a stable function reference — no need for a dynamic selector.
+const selectHasPermission = (s: { hasPermission: (code: string) => boolean }) => s.hasPermission;
+
 export function Permission({ code, children }: PermissionProps) {
-  const hasPermission = useAuthStore((state) => state.hasPermission);
-  if (!hasPermission(code)) {
-    return null;
-  }
+  const hasPermission = useAuthStore(selectHasPermission);
+  if (!hasPermission(code)) return null;
   return <>{children}</>;
 }

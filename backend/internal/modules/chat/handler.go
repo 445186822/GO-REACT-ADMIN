@@ -116,7 +116,9 @@ type ParticipantsRequest struct {
 
 func (h *Handler) ListSessions(c echo.Context) error {
 	userID := middleware.CurrentUserID(c)
-	rows, err := h.db.Query(c.Request().Context(), `
+	ctx := c.Request().Context()
+
+	rows, err := h.db.Query(ctx, `
 		SELECT cs.id, cs.title, cs.status, cs.created_by, cs.created_at, cs.updated_at,
 		       cp.is_pinned, cp.muted,
 		       (SELECT COUNT(*) FROM chat_participants p WHERE p.session_id = cs.id AND p.removed_at IS NULL)
@@ -141,31 +143,83 @@ func (h *Handler) ListSessions(c echo.Context) error {
 	if err := rows.Err(); err != nil {
 		return err
 	}
+	if len(sessions) == 0 {
+		return response.OK(c, sessions)
+	}
 
+	// Batch load unread counts, participants, and last messages.
+	sessionIDs := make([]int64, len(sessions))
+	byID := make(map[int64]int, len(sessions))
 	for i := range sessions {
-		_ = h.db.QueryRow(c.Request().Context(), `
-			SELECT COUNT(*) FROM chat_messages cm
-			WHERE cm.session_id = $1
-			  AND cm.sender_id != $2
-			  AND cm.message_type != 'SYSTEM'
-			  AND cm.status != 'REVOKED'
-			  AND cm.id > COALESCE((SELECT last_read_message_id FROM chat_participants WHERE session_id = $1 AND user_id = $2), 0)
-		`, sessions[i].ID, userID).Scan(&sessions[i].Unread)
+		sessionIDs[i] = sessions[i].ID
+		byID[sessions[i].ID] = i
+	}
 
-		if users, err := h.loadParticipants(c.Request().Context(), sessions[i].ID); err == nil {
-			sessions[i].Users = users
+	// Unread counts — single batch query.
+	unreadRows, err := h.db.Query(ctx, `
+		SELECT cp.session_id,
+		       COUNT(cm.id) FILTER (WHERE cm.sender_id != $2 AND cm.message_type != 'SYSTEM' AND cm.status != 'REVOKED'
+		                            AND cm.id > COALESCE(cp.last_read_message_id, 0))
+		FROM chat_participants cp
+		LEFT JOIN chat_messages cm ON cm.session_id = cp.session_id
+		WHERE cp.user_id = $2 AND cp.removed_at IS NULL AND cp.session_id = ANY($1)
+		GROUP BY cp.session_id
+	`, sessionIDs, userID)
+	if err != nil {
+		return err
+	}
+	defer unreadRows.Close()
+	for unreadRows.Next() {
+		var sid, unread int64
+		if err := unreadRows.Scan(&sid, &unread); err != nil {
+			return err
 		}
+		if idx, ok := byID[sid]; ok {
+			sessions[idx].Unread = unread
+		}
+	}
 
+	// Participants — single batch query.
+	userRows, err := h.db.Query(ctx, `
+		SELECT cp.session_id, su.id, su.display_name
+		FROM chat_participants cp
+		JOIN sys_users su ON su.id = cp.user_id
+		WHERE cp.session_id = ANY($1) AND cp.removed_at IS NULL
+		ORDER BY cp.created_at, su.id
+	`, sessionIDs)
+	if err != nil {
+		return err
+	}
+	defer userRows.Close()
+	for userRows.Next() {
+		var sid, uid int64
+		var name string
+		if err := userRows.Scan(&sid, &uid, &name); err != nil {
+			return err
+		}
+		if idx, ok := byID[sid]; ok {
+			sessions[idx].Users = append(sessions[idx].Users, UserBrief{ID: uid, DisplayName: name})
+		}
+	}
+
+	// Last messages — single batch query with DISTINCT ON.
+	msgRows, err := h.db.Query(ctx, `
+		SELECT DISTINCT ON (session_id) `+messageSelectColumns+`
+		FROM chat_messages
+		WHERE session_id = ANY($1)
+		ORDER BY session_id, created_at DESC
+	`, sessionIDs)
+	if err != nil {
+		return err
+	}
+	defer msgRows.Close()
+	for msgRows.Next() {
 		var msg MessageRow
-		err := scanMessage(h.db.QueryRow(c.Request().Context(), `
-			SELECT `+messageSelectColumns+`
-			FROM chat_messages
-			WHERE session_id = $1
-			ORDER BY created_at DESC
-			LIMIT 1
-		`, sessions[i].ID), &msg)
-		if err == nil {
-			sessions[i].LastMsg = &msg
+		if err := scanMessage(msgRows, &msg); err != nil {
+			return err
+		}
+		if idx, ok := byID[msg.SessionID]; ok {
+			sessions[idx].LastMsg = &msg
 		}
 	}
 

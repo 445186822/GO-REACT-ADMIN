@@ -75,30 +75,30 @@ func (h *Handler) DBStats(c echo.Context) error {
 		MaxConns:    stats.MaxConns(),
 	}
 
-	// DB version
-	h.db.QueryRow(ctx, `SELECT version()`).Scan(&data.Version)
+	// DB version (best-effort: individual stats failures are non-critical)
+	_ = h.db.QueryRow(ctx, `SELECT version()`).Scan(&data.Version)
 
 	// DB size
-	h.db.QueryRow(ctx,
+	_ = h.db.QueryRow(ctx,
 		`SELECT COALESCE(pg_database_size(current_database()), 0) / 1024 / 1024`).Scan(&data.DBSizeMB)
 
 	// Table count
-	h.db.QueryRow(ctx,
+	_ = h.db.QueryRow(ctx,
 		`SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`).Scan(&data.TableCount)
 
 	// Total requests
-	h.db.QueryRow(ctx, `SELECT COALESCE(count(*), 0) FROM sys_audit_logs`).Scan(&data.TotalRequests)
+	_ = h.db.QueryRow(ctx, `SELECT COALESCE(count(*), 0) FROM sys_audit_logs`).Scan(&data.TotalRequests)
 
 	// Today requests
-	h.db.QueryRow(ctx, `SELECT COALESCE(count(*), 0) FROM sys_audit_logs WHERE created_at >= CURRENT_DATE`).Scan(&data.TodayRequests)
+	_ = h.db.QueryRow(ctx, `SELECT COALESCE(count(*), 0) FROM sys_audit_logs WHERE created_at >= CURRENT_DATE`).Scan(&data.TodayRequests)
 
 	// Avg latency
-	h.db.QueryRow(ctx,
+	_ = h.db.QueryRow(ctx,
 		`SELECT COALESCE(AVG(COALESCE((detail::jsonb->>'latency_ms')::bigint, 0)), 0)::bigint FROM sys_audit_logs WHERE created_at >= CURRENT_DATE`).Scan(&data.AvgLatencyMs)
 
 	// User count
-	h.db.QueryRow(ctx, `SELECT COALESCE(count(*), 0) FROM sys_users WHERE deleted_at IS NULL`).Scan(&data.UserCount)
-	h.db.QueryRow(ctx, `SELECT COALESCE(count(*), 0) FROM biz_customers WHERE deleted_at IS NULL`).Scan(&data.CustomerCount)
+	_ = h.db.QueryRow(ctx, `SELECT COALESCE(count(*), 0) FROM sys_users WHERE deleted_at IS NULL`).Scan(&data.UserCount)
+	_ = h.db.QueryRow(ctx, `SELECT COALESCE(count(*), 0) FROM biz_customers WHERE deleted_at IS NULL`).Scan(&data.CustomerCount)
 
 	return response.OK(c, data)
 }

@@ -55,7 +55,7 @@ type DictTypeForm struct {
 
 func (h *Handler) ListTypes(c echo.Context) error {
 	keyword := c.QueryParam("keyword")
-	page, pageSize := pagination(c)
+	page, pageSize := response.PageParams(c, 1000)
 	offset := (page - 1) * pageSize
 
 	var total int64
@@ -346,14 +346,3 @@ func (h *Handler) BatchSortItems(c echo.Context) error {
 	return response.OK(c, map[string]bool{"sorted": true})
 }
 
-func pagination(c echo.Context) (int64, int64) {
-	page, _ := strconv.ParseInt(c.QueryParam("page"), 10, 64)
-	pageSize, _ := strconv.ParseInt(c.QueryParam("page_size"), 10, 64)
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 1000 {
-		pageSize = 20
-	}
-	return page, pageSize
-}

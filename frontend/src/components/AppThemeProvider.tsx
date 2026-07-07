@@ -1,6 +1,7 @@
 import { App as AntdApp, ConfigProvider, Empty, theme as antdTheme, type ThemeConfig } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { useEffect, type ReactNode } from 'react';
+import { useShallow } from 'zustand/shallow';
 import { useAppearanceStore } from '../store/appearanceStore';
 import { initAppApi } from '../utils/message';
 
@@ -20,17 +21,23 @@ function MessageInit({ children }: { children: ReactNode }) {
 }
 
 export function AppThemeProvider({ children }: { children: ReactNode }) {
-  const primaryColor = useAppearanceStore((state) => state.primaryColor);
-  const borderRadius = useAppearanceStore((state) => state.borderRadius);
-  const density = useAppearanceStore((state) => state.density);
-  const sidebarTheme = useAppearanceStore((state) => state.sidebarTheme);
-  const contentPadding = useAppearanceStore((state) => state.contentPadding);
-  const tabStyle = useAppearanceStore((state) => state.tabStyle);
-  const headerStyle = useAppearanceStore((state) => state.headerStyle);
-  const pageTone = useAppearanceStore((state) => state.pageTone);
-  const layoutMode = useAppearanceStore((state) => state.layoutMode);
-  const showBreadcrumb = useAppearanceStore((state) => state.showBreadcrumb);
-  const showPageSearch = useAppearanceStore((state) => state.showPageSearch);
+  const {
+    primaryColor, borderRadius, density, sidebarTheme,
+    contentPadding, tabStyle, headerStyle, pageTone,
+    layoutMode, showBreadcrumb, showPageSearch,
+  } = useAppearanceStore(useShallow((state) => ({
+    primaryColor: state.primaryColor,
+    borderRadius: state.borderRadius,
+    density: state.density,
+    sidebarTheme: state.sidebarTheme,
+    contentPadding: state.contentPadding,
+    tabStyle: state.tabStyle,
+    headerStyle: state.headerStyle,
+    pageTone: state.pageTone,
+    layoutMode: state.layoutMode,
+    showBreadcrumb: state.showBreadcrumb,
+    showPageSearch: state.showPageSearch,
+  })));
 
   useEffect(() => {
     const root = document.documentElement;

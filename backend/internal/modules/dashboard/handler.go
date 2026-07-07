@@ -126,5 +126,3 @@ func (h *Handler) Stats(c echo.Context) error {
 	return response.OK(c, stats)
 }
 
-// Ensure Handler implements a console interface check at compile time.
-var _ interface{ Register(*echo.Group) } = (*Handler)(nil)

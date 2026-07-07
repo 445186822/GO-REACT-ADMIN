@@ -63,7 +63,7 @@ type RecycledRow struct {
 func (h *Handler) List(c echo.Context) error {
 	sourceTable := c.QueryParam("source_table")
 	keyword := c.QueryParam("keyword")
-	page, pageSize := pagination(c)
+	page, pageSize := response.PageParams(c, 100)
 	offset := (page - 1) * pageSize
 
 	where := "WHERE ($1 = '' OR r.source_table = $1) AND ($2 = '' OR r.summary ILIKE '%' || $2 || '%')"
@@ -161,17 +161,6 @@ func (h *Handler) PurgeAll(c echo.Context) error {
 	return response.OK(c, map[string]bool{"purged": true})
 }
 
-func pagination(c echo.Context) (int64, int64) {
-	page, _ := strconv.ParseInt(c.QueryParam("page"), 10, 64)
-	pageSize, _ := strconv.ParseInt(c.QueryParam("page_size"), 10, 64)
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
-	return page, pageSize
-}
 
 func safeIdent(s string) string {
 	for _, ch := range s {

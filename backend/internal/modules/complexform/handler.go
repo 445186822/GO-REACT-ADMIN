@@ -8,6 +8,7 @@ import (
 
 	"enterprise-demo/backend/internal/http/middleware"
 	"enterprise-demo/backend/internal/http/response"
+	"enterprise-demo/backend/internal/util"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
@@ -83,7 +84,7 @@ type Form struct {
 func (h *Handler) List(c echo.Context) error {
 	keyword := strings.TrimSpace(c.QueryParam("keyword"))
 	status := strings.TrimSpace(c.QueryParam("status"))
-	page, pageSize := pagination(c)
+	page, pageSize := response.PageParams(c, 10000)
 	offset := (page - 1) * pageSize
 
 	var total int64
@@ -234,14 +235,14 @@ func normalizeForm(form *Form) {
 	form.Category = strings.TrimSpace(form.Category)
 	form.Priority = strings.TrimSpace(form.Priority)
 	form.Status = strings.TrimSpace(form.Status)
-	form.StartDate = trimStringPtr(form.StartDate)
-	form.EndDate = trimStringPtr(form.EndDate)
-	form.AppointmentTime = trimStringPtr(form.AppointmentTime)
-	form.ContactName = trimStringPtr(form.ContactName)
-	form.ContactPhone = trimStringPtr(form.ContactPhone)
-	form.ContactEmail = trimStringPtr(form.ContactEmail)
-	form.AttachmentURL = trimStringPtr(form.AttachmentURL)
-	form.Remark = trimStringPtr(form.Remark)
+	form.StartDate = util.TrimStringPtr(form.StartDate)
+	form.EndDate = util.TrimStringPtr(form.EndDate)
+	form.AppointmentTime = util.TrimStringPtr(form.AppointmentTime)
+	form.ContactName = util.TrimStringPtr(form.ContactName)
+	form.ContactPhone = util.TrimStringPtr(form.ContactPhone)
+	form.ContactEmail = util.TrimStringPtr(form.ContactEmail)
+	form.AttachmentURL = util.TrimStringPtr(form.AttachmentURL)
+	form.Remark = util.TrimStringPtr(form.Remark)
 	if form.Category == "" {
 		form.Category = "PROCUREMENT"
 	}
@@ -267,25 +268,3 @@ func enabledValue(value *bool) bool {
 	return *value
 }
 
-func trimStringPtr(value *string) *string {
-	if value == nil {
-		return nil
-	}
-	trimmed := strings.TrimSpace(*value)
-	if trimmed == "" {
-		return nil
-	}
-	return &trimmed
-}
-
-func pagination(c echo.Context) (int64, int64) {
-	page, _ := strconv.ParseInt(c.QueryParam("page"), 10, 64)
-	pageSize, _ := strconv.ParseInt(c.QueryParam("page_size"), 10, 64)
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 10000 {
-		pageSize = 20
-	}
-	return page, pageSize
-}

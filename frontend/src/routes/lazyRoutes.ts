@@ -10,41 +10,38 @@ export type EnterpriseRoute = {
   loader: () => Promise<LazyModule>;
 };
 
+/** Create a lazy loader that extracts a named export as the default export for React.lazy. */
+function page(importFn: () => Promise<unknown>, exportName: string): () => Promise<LazyModule> {
+  return () => importFn().then((m) => ({ default: (m as Record<string, ComponentType>)[exportName] }));
+}
+
 export const enterpriseRoutes: EnterpriseRoute[] = [
-  route('dashboard', 'dashboard', () => import('../features/dashboard/pages/DashboardPage').then(named('DashboardPage'))),
-  route('system/users', 'user:view', () => import('../features/user/pages/UserListPage').then(named('UserListPage'))),
-  route('system/roles', 'role:view', () => import('../features/role/pages/RoleListPage').then(named('RoleListPage'))),
-  route('system/menus', 'menu:view', () => import('../features/menu/pages/MenuListPage').then(named('MenuListPage'))),
-  route('system/departments', 'department:view', () => import('../features/department/pages/DepartmentListPage').then(named('DepartmentListPage'))),
-  route('business/customers', 'customer:view', () => import('../features/customer/pages/CustomerListPage').then(named('CustomerListPage'))),
-  route('business/complex-forms', 'complex-form:view', () => import('../features/complexform/pages/ComplexFormPage').then(named('ComplexFormPage'))),
-  route('collaboration/todos', 'todo:view', () => import('../features/collaboration/pages/TodoCenterPage').then(named('TodoCenterPage'))),
-  route('collaboration/notifications', 'notification:view', () => import('../features/collaboration/pages/NotificationCenterPage').then(named('NotificationCenterPage'))),
-  route('collaboration/chat', 'chat:view', () => import('../features/chat/pages/ChatPage').then(named('ChatPage'))),
-  route('collaboration/message-templates', 'message-template:view', () => import('../features/collaboration/pages/MessageTemplatePage').then(named('MessageTemplatePage'))),
-  route('collaboration/approvals', 'approval:view', () => import('../features/collaboration/pages/ApprovalCenterPage').then(named('ApprovalCenterPage'))),
-  route('collaboration/workflows', 'workflow:view', () => import('../features/collaboration/pages/WorkflowPage').then(named('WorkflowPage'))),
-  route('collaboration/ai-assistant', 'ai:chat', () => import('../features/collaboration/pages/AIAssistantPage').then(named('AIAssistantPage'))),
-  route('files', 'file:view', () => import('../features/file/pages/FileCenterPage').then(named('FileCenterPage'))),
-  route('logs/operation', 'audit:view', () => import('../features/auditlog/pages/AuditLogPage').then(named('AuditLogPage'))),
-  route('settings', 'settings:view', () => import('../features/settings/pages/SettingsPage').then(named('SettingsPage'))),
-  route('system/data-dict', 'datadict:view', () => import('../features/datadict/pages/DataDictPage').then(named('DataDictPage'))),
-  route('system/recycle-bin', 'recycle:view', () => import('../features/recyclebin/pages/RecycleBinPage').then(named('RecycleBinPage'))),
-  route('system/monitor', 'monitor:view', () => import('../features/monitor/pages/SystemMonitorPage').then(named('SystemMonitorPage'))),
-  route('system/scheduler', 'scheduler:view', () => import('../features/scheduler/pages/SchedulerPage').then(named('SchedulerPage'))),
-  route('system/architecture', 'architecture:view', () => import('../features/architecture/pages/ArchitecturePage').then(named('ArchitecturePage'))),
-  route('system/queue-lab/kafka', 'queue:kafka', () => import('../features/queuelab/pages/KafkaLabPage').then(named('KafkaLabPage'))),
-  route('system/queue-lab/rabbitmq', 'queue:rabbitmq', () => import('../features/queuelab/pages/RabbitMQLabPage').then(named('RabbitMQLabPage'))),
-  route('system/queue-lab/tcp', 'queue:tcp', () => import('../features/queuelab/pages/IoTProtocolLabPage').then(named('TCPLabPage'))),
-  route('system/queue-lab/udp', 'queue:udp', () => import('../features/queuelab/pages/IoTProtocolLabPage').then(named('UDPLabPage'))),
-  route('system/queue-lab/mqtt', 'queue:mqtt', () => import('../features/queuelab/pages/IoTProtocolLabPage').then(named('MQTTLabPage'))),
-  route('knowledge-base', 'kb:view', () => import('../features/knowledgebase/pages/KnowledgeBasePage').then(named('KnowledgeBasePage'))),
+  { path: 'dashboard',                   permission: 'dashboard',            loader: page(() => import('../features/dashboard/pages/DashboardPage'), 'DashboardPage') },
+  { path: 'system/users',               permission: 'user:view',            loader: page(() => import('../features/user/pages/UserListPage'), 'UserListPage') },
+  { path: 'system/roles',               permission: 'role:view',            loader: page(() => import('../features/role/pages/RoleListPage'), 'RoleListPage') },
+  { path: 'system/menus',               permission: 'menu:view',            loader: page(() => import('../features/menu/pages/MenuListPage'), 'MenuListPage') },
+  { path: 'system/departments',         permission: 'department:view',      loader: page(() => import('../features/department/pages/DepartmentListPage'), 'DepartmentListPage') },
+  { path: 'business/customers',         permission: 'customer:view',        loader: page(() => import('../features/customer/pages/CustomerListPage'), 'CustomerListPage') },
+  { path: 'business/complex-forms',     permission: 'complex-form:view',    loader: page(() => import('../features/complexform/pages/ComplexFormPage'), 'ComplexFormPage') },
+  { path: 'collaboration/todos',         permission: 'todo:view',            loader: page(() => import('../features/collaboration/pages/TodoCenterPage'), 'TodoCenterPage') },
+  { path: 'collaboration/notifications', permission: 'notification:view',   loader: page(() => import('../features/collaboration/pages/NotificationCenterPage'), 'NotificationCenterPage') },
+  { path: 'collaboration/chat',          permission: 'chat:view',            loader: page(() => import('../features/chat/pages/ChatPage'), 'ChatPage') },
+  { path: 'collaboration/message-templates', permission: 'message-template:view', loader: page(() => import('../features/collaboration/pages/MessageTemplatePage'), 'MessageTemplatePage') },
+  { path: 'collaboration/approvals',     permission: 'approval:view',        loader: page(() => import('../features/collaboration/pages/ApprovalCenterPage'), 'ApprovalCenterPage') },
+  { path: 'collaboration/workflows',     permission: 'workflow:view',        loader: page(() => import('../features/collaboration/pages/WorkflowPage'), 'WorkflowPage') },
+  { path: 'collaboration/ai-assistant',  permission: 'ai:chat',              loader: page(() => import('../features/collaboration/pages/AIAssistantPage'), 'AIAssistantPage') },
+  { path: 'files',                       permission: 'file:view',            loader: page(() => import('../features/file/pages/FileCenterPage'), 'FileCenterPage') },
+  { path: 'logs/operation',             permission: 'audit:view',            loader: page(() => import('../features/auditlog/pages/AuditLogPage'), 'AuditLogPage') },
+  { path: 'settings',                    permission: 'settings:view',        loader: page(() => import('../features/settings/pages/SettingsPage'), 'SettingsPage') },
+  { path: 'system/data-dict',           permission: 'datadict:view',        loader: page(() => import('../features/datadict/pages/DataDictPage'), 'DataDictPage') },
+  { path: 'system/recycle-bin',         permission: 'recycle:view',         loader: page(() => import('../features/recyclebin/pages/RecycleBinPage'), 'RecycleBinPage') },
+  { path: 'system/monitor',             permission: 'monitor:view',         loader: page(() => import('../features/monitor/pages/SystemMonitorPage'), 'SystemMonitorPage') },
+  { path: 'system/scheduler',           permission: 'scheduler:view',       loader: page(() => import('../features/scheduler/pages/SchedulerPage'), 'SchedulerPage') },
+  { path: 'system/architecture',        permission: 'architecture:view',    loader: page(() => import('../features/architecture/pages/ArchitecturePage'), 'ArchitecturePage') },
+  { path: 'system/queue-lab/kafka',     permission: 'queue:kafka',          loader: page(() => import('../features/queuelab/pages/KafkaLabPage'), 'KafkaLabPage') },
+  { path: 'system/queue-lab/rabbitmq',  permission: 'queue:rabbitmq',       loader: page(() => import('../features/queuelab/pages/RabbitMQLabPage'), 'RabbitMQLabPage') },
+  { path: 'system/queue-lab/tcp',       permission: 'queue:tcp',            loader: page(() => import('../features/queuelab/pages/IoTProtocolLabPage'), 'TCPLabPage') },
+  { path: 'system/queue-lab/udp',       permission: 'queue:udp',            loader: page(() => import('../features/queuelab/pages/IoTProtocolLabPage'), 'UDPLabPage') },
+  { path: 'system/queue-lab/mqtt',      permission: 'queue:mqtt',           loader: page(() => import('../features/queuelab/pages/IoTProtocolLabPage'), 'MQTTLabPage') },
+  { path: 'knowledge-base',             permission: 'kb:view',              loader: page(() => import('../features/knowledgebase/pages/KnowledgeBasePage'), 'KnowledgeBasePage') },
 ];
-
-function route(path: string, permission: string, loader: EnterpriseRoute['loader']): EnterpriseRoute {
-  return { path, permission, loader };
-}
-
-function named(exportName: string) {
-  return (module: unknown) => ({ default: (module as Record<string, ComponentType>)[exportName] });
-}

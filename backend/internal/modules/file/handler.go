@@ -48,7 +48,7 @@ type Row struct {
 }
 
 func (h *Handler) List(c echo.Context) error {
-	page, pageSize := pagination(c)
+	page, pageSize := response.PageParams(c, 10000)
 	offset := (page - 1) * pageSize
 	keyword := c.QueryParam("keyword")
 
@@ -156,18 +156,6 @@ func (h *Handler) Delete(c echo.Context) error {
 		return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "file not found")
 	}
 	return response.OK(c, map[string]bool{"deleted": true})
-}
-
-func pagination(c echo.Context) (int64, int64) {
-	page, _ := strconv.ParseInt(c.QueryParam("page"), 10, 64)
-	pageSize, _ := strconv.ParseInt(c.QueryParam("page_size"), 10, 64)
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 10000 {
-		pageSize = 20
-	}
-	return page, pageSize
 }
 
 func randomName() string {

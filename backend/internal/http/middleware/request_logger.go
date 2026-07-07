@@ -18,14 +18,25 @@ func RequestLogger(log *slog.Logger) echo.MiddlewareFunc {
 			req := c.Request()
 			res := c.Response()
 
-			log.Info("http request",
-				"request_id", requestID,
-				"method", req.Method,
-				"path", req.URL.Path,
-				"status", res.Status,
-				"latency_ms", latency.Milliseconds(),
-				"ip", c.RealIP(),
-			)
+			level := slog.LevelInfo
+			if res.Status >= 500 {
+				level = slog.LevelError
+			} else if res.Status >= 400 {
+				level = slog.LevelWarn
+			}
+
+			attrs := []slog.Attr{
+				slog.String("request_id", requestID),
+				slog.String("method", req.Method),
+				slog.String("path", req.URL.Path),
+				slog.Int("status", res.Status),
+				slog.Int64("latency_ms", latency.Milliseconds()),
+				slog.String("ip", c.RealIP()),
+			}
+			if err != nil {
+				attrs = append(attrs, slog.String("error", err.Error()))
+			}
+			log.LogAttrs(c.Request().Context(), level, "http request", attrs...)
 
 			return err
 		}

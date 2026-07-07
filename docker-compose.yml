@@ -29,6 +29,33 @@ services:
       timeout: 3s
       retries: 10
 
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: enterprise-demo-backend
+    environment:
+      APP_ENV: development
+      HTTP_ADDR: ":8080"
+      DATABASE_URL: postgres://enterprise:enterprise@postgres:5432/enterprise_demo?sslmode=disable
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: change-me-in-production
+      ALLOWED_ORIGIN: http://localhost:5173
+      INITIAL_ADMIN_PASSWORD: admin123
+      AUTO_MIGRATE: "true"
+      AUTO_SEED: "true"
+      SCHEDULER_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - backend_uploads:/app/uploads
+
 volumes:
   postgres_data:
   redis_data:
+  backend_uploads:

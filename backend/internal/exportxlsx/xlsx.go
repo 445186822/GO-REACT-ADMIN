@@ -8,10 +8,6 @@ import (
 	"strconv"
 )
 
-type CellValue interface {
-	~string | ~int | ~int64 | ~float64 | ~bool
-}
-
 func Build(sheetName string, rows [][]string) ([]byte, error) {
 	var buffer bytes.Buffer
 	zipWriter := zip.NewWriter(&buffer)
