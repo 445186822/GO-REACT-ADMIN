@@ -20,7 +20,7 @@ export function NotificationDetailModal({ open, notification, onClose, onOpenCen
         </Space>
       }
       open={open}
-      width={680}
+      width="min(680px, calc(100vw - 32px))"
       onCancel={onClose}
       footer={
         <Space>
@@ -44,7 +44,7 @@ export function NotificationDetailModal({ open, notification, onClose, onOpenCen
             <Tag color={notification.read_at ? 'default' : 'blue'}>{notificationReadText(notification)}</Tag>
           </div>
 
-          <Descriptions size="small" column={2} bordered>
+          <Descriptions size="small" column={{ xs: 1, sm: 1, md: 2 }} bordered className="notification-detail-descriptions">
             <Descriptions.Item label="类型">{notificationTypeText(notification.notif_type)}</Descriptions.Item>
             <Descriptions.Item label="来源">{notification.source_module || '-'}</Descriptions.Item>
             <Descriptions.Item label={<Space size={4}><ClockCircleOutlined />创建时间</Space>}>

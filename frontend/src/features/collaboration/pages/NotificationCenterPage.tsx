@@ -77,10 +77,10 @@ export function NotificationCenterPage() {
 
   return (
     <div>
-      <Space align="center" className="page-status-strip">
+      <Space align="center" wrap className="page-status-strip notification-status-strip">
         <span>未读消息：{unread} 条</span>
         <Tooltip title={wsConnected ? '实时连接正常' : '实时连接已断开'}>
-          <Tag color={wsConnected ? 'green' : 'red'} style={{ marginLeft: 8 }}>
+          <Tag color={wsConnected ? 'green' : 'red'}>
             <WifiOutlined /> 实时连接：{wsConnected ? '已连接' : '已断开'}
           </Tag>
         </Tooltip>

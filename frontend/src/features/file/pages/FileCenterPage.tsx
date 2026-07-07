@@ -21,6 +21,11 @@ export function FileCenterPage() {
 
   const columns: ProColumns<FileRow>[] = [
     {
+      title: '关键词',
+      dataIndex: 'keyword',
+      hideInTable: true,
+    },
+    {
       title: '文件名',
       dataIndex: 'original_name',
       copyable: true,
@@ -133,7 +138,7 @@ export function FileCenterPage() {
   }
 
   return (
-    <div style={{ padding: '0 0 24px' }}>
+    <div>
       <ProTable<FileRow>
         actionRef={actionRef}
         rowKey="id"
@@ -163,9 +168,10 @@ export function FileCenterPage() {
                 try {
                   await uploadFile(file as File, (pct) => setUploadProgress(pct));
                   message.success('文件已上传');
-                  actionRef.current?.reload();
+                  actionRef.current?.reloadAndRest?.();
                   onSuccess?.({});
                 } catch (error) {
+                  message.error('上传失败，请检查文件大小、权限或服务状态');
                   onError?.(error as Error);
                 } finally {
                   setUploading(false);
@@ -187,7 +193,7 @@ export function FileCenterPage() {
         open={Boolean(previewFile)}
         onCancel={closePreview}
         footer={null}
-        width={720}
+        width="min(720px, calc(100vw - 32px))"
       >
         {previewFile && (
           <div style={{ textAlign: 'center' }}>

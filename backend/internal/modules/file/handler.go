@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -99,8 +99,8 @@ func (h *Handler) Upload(c echo.Context) error {
 	if err := os.MkdirAll(h.uploadDir, 0o755); err != nil {
 		return err
 	}
-	storedName := randomName() + path.Ext(header.Filename)
-	storagePath := path.Join(h.uploadDir, storedName)
+	storedName := storedFileNameFor(header.Filename, randomName())
+	storagePath := storagePathFor(h.uploadDir, storedName)
 	dst, err := os.Create(storagePath)
 	if err != nil {
 		return err
@@ -164,4 +164,12 @@ func randomName() string {
 		return strconv.FormatInt(time.Now().UnixNano(), 10)
 	}
 	return hex.EncodeToString(b[:])
+}
+
+func storedFileNameFor(originalName string, token string) string {
+	return token + filepath.Ext(filepath.Base(originalName))
+}
+
+func storagePathFor(uploadDir string, storedName string) string {
+	return filepath.Join(uploadDir, storedName)
 }

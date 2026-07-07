@@ -8,9 +8,10 @@ import {
   ReloadOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { Avatar, Badge, Breadcrumb, Button, ColorPicker, Divider, Drawer, Dropdown, Empty, Form, Input, Layout, Menu, Modal, Popover, Segmented, Select, Slider, Space, Spin, Switch, Tabs, Typography, type MenuProps } from 'antd';
+import { Avatar, Badge, Breadcrumb, Button, ColorPicker, Divider, Drawer, Dropdown, Empty, Form, Grid, Input, Layout, Menu, Modal, Popover, Segmented, Select, Slider, Space, Spin, Switch, Tabs, Typography, type MenuProps } from 'antd';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useShallow } from 'zustand/shallow';
 import { changePasswordApi } from '../api/auth';
 import { listNotifications, markAllNotificationsRead, markNotificationRead, unreadNotificationCount, type NotificationRow } from '../api/collaboration';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -40,11 +41,13 @@ export function BasicLayout() {
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<NotificationRow | null>(null);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
   const [passwordForm] = Form.useForm<ChangePasswordForm>();
   const navigate = useNavigate();
   const location = useLocation();
+  const screens = Grid.useBreakpoint();
   const clearSession = useAuthStore((state) => state.clearSession);
   const accessToken = useAuthStore((state) => state.accessToken);
   const user = useAuthStore((state) => state.user);
@@ -66,6 +69,9 @@ export function BasicLayout() {
   const pageTitle = currentTrail.at(-1)?.name ?? 'Workspace';
   const breadcrumbItems = [{ title: 'Home' }, ...currentTrail.map((item) => ({ title: item.name }))];
   const userDisplayName = user?.display_name || user?.username || '';
+  const isMobile = screens.md === false;
+  const isMobileSideLayout = layoutMode === 'side' && isMobile;
+  const isMobileTopLayout = layoutMode === 'top' && isMobile;
   const activeRole = useMemo(
     () => user?.roles?.find((role) => role.code === activeRoleCode) ?? user?.active_role ?? user?.roles?.[0],
     [activeRoleCode, user?.active_role, user?.roles],
@@ -324,6 +330,29 @@ export function BasicLayout() {
     }
   };
 
+  const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
+    if (String(key).startsWith('/')) {
+      navigate(key);
+      setMobileMenuOpen(false);
+    }
+  };
+
+  const handleMenuOpenChange = (keys: string[]) => {
+    setOpenKeys(keys);
+  };
+
+  const renderNavigationMenu = (options: { collapsed?: boolean } = {}) => (
+    <Menu
+      theme={sidebarTheme}
+      mode="inline"
+      selectedKeys={activeMenu.selectedKey ? [activeMenu.selectedKey] : []}
+      openKeys={options.collapsed ? undefined : openKeys}
+      onOpenChange={options.collapsed ? undefined : handleMenuOpenChange}
+      onClick={handleMenuClick}
+      items={menuItems}
+    />
+  );
+
   const handleChangePassword = async () => {
     const values = await passwordForm.validateFields();
     setPasswordSubmitting(true);
@@ -385,26 +414,27 @@ export function BasicLayout() {
 
   return (
     <Layout className={`app-shell app-shell-${layoutMode}`}>
-      {layoutMode === 'side' && (
+      {layoutMode === 'side' && !isMobileSideLayout && (
         <Sider trigger={null} collapsible collapsed={collapsed} width={236} className={`app-sider app-sider-${sidebarTheme}`}>
           <div className="app-logo">
             <span className="app-logo-mark">ED</span>
             {!collapsed && <span className="app-logo-text">Enterprise Demo</span>}
           </div>
-          <Menu
-            theme={sidebarTheme}
-            mode="inline"
-            selectedKeys={activeMenu.selectedKey ? [activeMenu.selectedKey] : []}
-            openKeys={collapsed ? [] : openKeys}
-            onOpenChange={setOpenKeys}
-            onClick={({ key }) => {
-              if (String(key).startsWith('/')) {
-                navigate(key);
-              }
-            }}
-            items={menuItems}
-          />
+          {renderNavigationMenu({ collapsed })}
         </Sider>
+      )}
+      {(isMobileSideLayout || isMobileTopLayout) && (
+        <Drawer
+          title="菜单"
+          placement="left"
+          open={mobileMenuOpen}
+          onClose={() => setMobileMenuOpen(false)}
+          width={Math.min(300, typeof window !== 'undefined' ? window.innerWidth - 32 : 268)}
+          className={`mobile-menu-drawer mobile-menu-drawer-${sidebarTheme}`}
+          styles={{ body: { padding: 0 } }}
+        >
+          {renderNavigationMenu()}
+        </Drawer>
       )}
       <Layout>
         <Header className={`app-header app-header-${headerStyle}`}>
@@ -413,8 +443,26 @@ export function BasicLayout() {
               <>
                 <Button
                   type="text"
-                  icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                  onClick={() => setCollapsed(!collapsed)}
+                  icon={isMobileSideLayout || collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                  onClick={() => {
+                    if (isMobileSideLayout) {
+                      setMobileMenuOpen(true);
+                      return;
+                    }
+                    setCollapsed(!collapsed);
+                  }}
+                />
+                <div className="page-heading">
+                  <Typography.Text className="page-title">{pageTitle}</Typography.Text>
+                  {showBreadcrumb && <Breadcrumb items={breadcrumbItems} />}
+                </div>
+              </>
+            ) : isMobileTopLayout ? (
+              <>
+                <Button
+                  type="text"
+                  icon={<MenuUnfoldOutlined />}
+                  onClick={() => setMobileMenuOpen(true)}
                 />
                 <div className="page-heading">
                   <Typography.Text className="page-title">{pageTitle}</Typography.Text>
@@ -431,11 +479,7 @@ export function BasicLayout() {
                   className="app-top-menu"
                   mode="horizontal"
                   selectedKeys={activeMenu.selectedKey ? [activeMenu.selectedKey] : []}
-                  onClick={({ key }) => {
-                    if (String(key).startsWith('/')) {
-                      navigate(key);
-                    }
-                  }}
+                  onClick={handleMenuClick}
                   items={menuItems}
                 />
               </>
@@ -633,29 +677,41 @@ export function BasicLayout() {
 }
 
 function AppearanceDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const primaryColor = useAppearanceStore((state) => state.primaryColor);
-  const borderRadius = useAppearanceStore((state) => state.borderRadius);
-  const density = useAppearanceStore((state) => state.density);
-  const sidebarTheme = useAppearanceStore((state) => state.sidebarTheme);
-  const contentPadding = useAppearanceStore((state) => state.contentPadding);
-  const tabStyle = useAppearanceStore((state) => state.tabStyle);
-  const headerStyle = useAppearanceStore((state) => state.headerStyle);
-  const pageTone = useAppearanceStore((state) => state.pageTone);
-  const layoutMode = useAppearanceStore((state) => state.layoutMode);
-  const showBreadcrumb = useAppearanceStore((state) => state.showBreadcrumb);
-  const showPageSearch = useAppearanceStore((state) => state.showPageSearch);
-  const setPrimaryColor = useAppearanceStore((state) => state.setPrimaryColor);
-  const setBorderRadius = useAppearanceStore((state) => state.setBorderRadius);
-  const setDensity = useAppearanceStore((state) => state.setDensity);
-  const setSidebarTheme = useAppearanceStore((state) => state.setSidebarTheme);
-  const setContentPadding = useAppearanceStore((state) => state.setContentPadding);
-  const setTabStyle = useAppearanceStore((state) => state.setTabStyle);
-  const setHeaderStyle = useAppearanceStore((state) => state.setHeaderStyle);
-  const setPageTone = useAppearanceStore((state) => state.setPageTone);
-  const setLayoutMode = useAppearanceStore((state) => state.setLayoutMode);
-  const setShowBreadcrumb = useAppearanceStore((state) => state.setShowBreadcrumb);
-  const setShowPageSearch = useAppearanceStore((state) => state.setShowPageSearch);
-  const reset = useAppearanceStore((state) => state.reset);
+  const {
+    primaryColor, borderRadius, density, sidebarTheme, contentPadding,
+    tabStyle, headerStyle, pageTone, layoutMode, showBreadcrumb, showPageSearch,
+  } = useAppearanceStore(useShallow((s) => ({
+    primaryColor: s.primaryColor,
+    borderRadius: s.borderRadius,
+    density: s.density,
+    sidebarTheme: s.sidebarTheme,
+    contentPadding: s.contentPadding,
+    tabStyle: s.tabStyle,
+    headerStyle: s.headerStyle,
+    pageTone: s.pageTone,
+    layoutMode: s.layoutMode,
+    showBreadcrumb: s.showBreadcrumb,
+    showPageSearch: s.showPageSearch,
+  })));
+  const {
+    setPrimaryColor, setBorderRadius, setDensity, setSidebarTheme,
+    setContentPadding, setTabStyle, setHeaderStyle, setPageTone,
+    setLayoutMode, setShowBreadcrumb, setShowPageSearch,
+    reset,
+  } = useAppearanceStore(useShallow((s) => ({
+    setPrimaryColor: s.setPrimaryColor,
+    setBorderRadius: s.setBorderRadius,
+    setDensity: s.setDensity,
+    setSidebarTheme: s.setSidebarTheme,
+    setContentPadding: s.setContentPadding,
+    setTabStyle: s.setTabStyle,
+    setHeaderStyle: s.setHeaderStyle,
+    setPageTone: s.setPageTone,
+    setLayoutMode: s.setLayoutMode,
+    setShowBreadcrumb: s.setShowBreadcrumb,
+    setShowPageSearch: s.setShowPageSearch,
+    reset: s.reset,
+  })));
 
   return (
     <Drawer title="全局外观" open={open} onClose={onClose} width={360} zIndex={1300} extra={<Button onClick={reset}>恢复默认</Button>}>
