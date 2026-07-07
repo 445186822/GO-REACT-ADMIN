@@ -11,6 +11,7 @@ import (
 	authmodule "enterprise-demo/backend/internal/modules/auth"
 	"enterprise-demo/backend/internal/modules/chat"
 	"enterprise-demo/backend/internal/modules/collaboration"
+	"enterprise-demo/backend/internal/modules/complexform"
 	"enterprise-demo/backend/internal/modules/customer"
 	"enterprise-demo/backend/internal/modules/dashboard"
 	"enterprise-demo/backend/internal/modules/datadict"
@@ -59,6 +60,7 @@ func NewServer(cfg config.Config, log *slog.Logger, db *pgxpool.Pool) *echo.Echo
 	menu.NewHandler(db, cfg.JWTSecret).Register(api)
 	department.NewHandler(db, cfg.JWTSecret).Register(api)
 	customer.NewHandler(db, cfg.JWTSecret).Register(api)
+	complexform.NewHandler(db, cfg.JWTSecret).Register(api)
 	filemodule.NewHandler(db, cfg.JWTSecret, cfg.UploadDir).Register(api)
 	auditlog.NewHandler(db, cfg.JWTSecret).Register(api)
 	settings.NewHandler(db, cfg.JWTSecret).Register(api)

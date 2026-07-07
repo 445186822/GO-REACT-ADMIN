@@ -31,6 +31,22 @@ func TestSeedMenusGroupsMessagingAndProtocolExperienceMenus(t *testing.T) {
 	}
 }
 
+func TestSeedMenusIncludesComplexFormBusinessExample(t *testing.T) {
+	required := []string{
+		"('business', 'page', 'complex-form:view', '复杂表单示例'",
+		"'/business/complex-forms'",
+		"'ComplexFormPage'",
+		"('complex-form:view', 'button', 'complex-form:create', '创建复杂表单'",
+		"('complex-form:view', 'button', 'complex-form:update', '编辑复杂表单'",
+		"('complex-form:view', 'button', 'complex-form:delete', '删除复杂表单'",
+	}
+	for _, text := range required {
+		if !strings.Contains(seedMenusSQL, text) {
+			t.Fatalf("seedMenusSQL must contain %q", text)
+		}
+	}
+}
+
 func TestValidateMigrationFilesRejectsNewDuplicateNumbers(t *testing.T) {
 	err := validateMigrationFiles([]string{
 		"migrations/000020_runtime.up.sql",

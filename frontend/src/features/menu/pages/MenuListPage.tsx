@@ -16,6 +16,7 @@ import { ExportButton } from '../../../components/ExportButton';
 import { Permission } from '../../../components/Permission';
 import { exportExcel } from '../../../utils/exportExcel';
 import { operationColumnProps } from '../../../utils/tableColumns';
+import { menuIconOptions, renderMenuIconLabel, renderMenuIconOption } from '../menuIcons';
 import { buildMenuTree, menuParentOptions, type MenuTreeRow, typeText } from '../menuView';
 
 export function MenuListPage() {
@@ -49,7 +50,7 @@ export function MenuListPage() {
     },
     { title: '路由', dataIndex: 'path' },
     { title: '组件', dataIndex: 'component', width: 160 },
-    { title: '图标', dataIndex: 'icon', width: 160 },
+    { title: '图标', dataIndex: 'icon', width: 220, render: (_, row) => renderMenuIconLabel(row.icon) },
     { title: '排序', dataIndex: 'sort_order', width: 80 },
     {
       title: '操作',
@@ -226,7 +227,21 @@ export function MenuListPage() {
         <ProFormText name="name" label="名称" rules={[{ required: true }]} />
         <ProFormText name="path" label="路由路径" />
         <ProFormText name="component" label="组件标识" />
-        <ProFormText name="icon" label="图标" />
+        <ProFormSelect
+          name="icon"
+          label="图标"
+          options={menuIconOptions}
+          placeholder="请选择菜单图标"
+          fieldProps={{
+            allowClear: true,
+            showSearch: true,
+            virtual: false,
+            listHeight: 360,
+            popupClassName: 'menu-icon-select-popup',
+            optionFilterProp: 'searchLabel',
+            optionRender: (option) => renderMenuIconOption(option.value),
+          }}
+        />
         <ProFormDigit name="sort_order" label="排序" min={0} max={9999} />
       </ModalForm>
     </div>

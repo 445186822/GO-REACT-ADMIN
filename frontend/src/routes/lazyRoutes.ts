@@ -17,6 +17,7 @@ export const enterpriseRoutes: EnterpriseRoute[] = [
   route('system/menus', 'menu:view', () => import('../features/menu/pages/MenuListPage').then(named('MenuListPage'))),
   route('system/departments', 'department:view', () => import('../features/department/pages/DepartmentListPage').then(named('DepartmentListPage'))),
   route('business/customers', 'customer:view', () => import('../features/customer/pages/CustomerListPage').then(named('CustomerListPage'))),
+  route('business/complex-forms', 'complex-form:view', () => import('../features/complexform/pages/ComplexFormPage').then(named('ComplexFormPage'))),
   route('collaboration/todos', 'todo:view', () => import('../features/collaboration/pages/TodoCenterPage').then(named('TodoCenterPage'))),
   route('collaboration/notifications', 'notification:view', () => import('../features/collaboration/pages/NotificationCenterPage').then(named('NotificationCenterPage'))),
   route('collaboration/chat', 'chat:view', () => import('../features/chat/pages/ChatPage').then(named('ChatPage'))),

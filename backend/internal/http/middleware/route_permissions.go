@@ -41,6 +41,10 @@ func PermissionForRequest(method string, rawPath string) string {
 		return "customer:create"
 	case path == "/customers/:id":
 		return permissionByMethod(method, "", "", "customer:update", "customer:delete")
+	case path == "/complex-forms":
+		return permissionByMethod(method, "complex-form:view", "complex-form:create", "", "")
+	case path == "/complex-forms/:id":
+		return permissionByMethod(method, "", "", "complex-form:update", "complex-form:delete")
 	case path == "/files":
 		return "file:view"
 	case path == "/files/upload":

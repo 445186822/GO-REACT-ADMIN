@@ -8,6 +8,7 @@
     "build": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && vite build",
     "preview": "vite preview",
     "test": "vitest run src",
+    "generate:menu-icons": "node scripts/generate-menu-icons.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {

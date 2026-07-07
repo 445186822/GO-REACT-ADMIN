@@ -235,6 +235,32 @@ paths:
       responses:
         "200":
           description: Deleted
+  /complex-forms:
+    get:
+      summary: List complex form business examples
+      responses:
+        "200":
+          description: Paged complex form records
+    post:
+      summary: Create complex form business example
+      responses:
+        "201":
+          description: Created complex form ID
+  /complex-forms/{id}:
+    put:
+      summary: Update complex form business example
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      summary: Soft delete complex form business example
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Deleted
   /files:
     get:
       summary: List uploaded files
