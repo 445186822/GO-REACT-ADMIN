@@ -47,4 +47,12 @@ describe('formatApiTimes', () => {
       biz_type: 'leave_demo',
     });
   });
+
+  it('preserves binary response blobs', () => {
+    const blob = new Blob(['xlsx-content'], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+
+    expect(formatApiTimes(blob)).toBe(blob);
+  });
 });

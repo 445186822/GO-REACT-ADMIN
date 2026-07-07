@@ -42,7 +42,7 @@ func NewServer(cfg config.Config, log *slog.Logger, db *pgxpool.Pool) *echo.Echo
 	e.Use(middleware.RequestLogger(log))
 	e.Use(emiddleware.Recover())
 	e.Use(emiddleware.CORSWithConfig(emiddleware.CORSConfig{
-		AllowOrigins: []string{cfg.AllowedOrigin},
+		AllowOrigins: cfg.AllowedOrigins(),
 		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
 		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization, "X-Request-ID"},
 	}))

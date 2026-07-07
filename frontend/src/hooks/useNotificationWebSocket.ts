@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 
 type MessageHandler = (event: { event: string; count?: number }) => void;
@@ -27,8 +27,12 @@ function notifyConnectionChange(connected: boolean) {
 }
 
 function connect(token: string) {
-  if (sharedWs && sharedWs.readyState === WebSocket.OPEN && activeToken === token) {
-    return; // already connected with same token
+  if (
+    sharedWs &&
+    activeToken === token &&
+    (sharedWs.readyState === WebSocket.OPEN || sharedWs.readyState === WebSocket.CONNECTING)
+  ) {
+    return;
   }
 
   // Close existing if token changed
@@ -108,6 +112,11 @@ function disconnect() {
   reconnectDelay = 1000;
 }
 
+function reconnect(token: string) {
+  disconnect();
+  connect(token);
+}
+
 /**
  * Shared WebSocket hook for notification real-time updates.
  * Multiple components using this hook share a single WebSocket connection.
@@ -134,14 +143,19 @@ export function useNotificationWebSocket() {
     listeners.add(handler);
 
     // Ensure connection is active
-    if (!sharedWs || sharedWs.readyState !== WebSocket.OPEN) {
+    if (!sharedWs || (sharedWs.readyState !== WebSocket.OPEN && sharedWs.readyState !== WebSocket.CONNECTING)) {
       connect(token);
     } else {
-      setConnected(true);
+      setConnected(sharedWs.readyState === WebSocket.OPEN);
     }
+
+    const interval = setInterval(() => {
+      setConnected(sharedWs?.readyState === WebSocket.OPEN);
+    }, 1000);
 
     return () => {
       listeners.delete(handler);
+      clearInterval(interval);
       // If no more listeners, clean up connection
       if (listeners.size === 0) {
         disconnect();
@@ -153,9 +167,18 @@ export function useNotificationWebSocket() {
    * Subscribe to specific WebSocket events (e.g., 'unread_count', 'notifications_changed').
    * Pass the handler as the second argument to the hook call or use onMessage ref.
    */
-  const onMessage = (fn: MessageHandler) => {
+  const onMessage = useCallback((fn: MessageHandler) => {
     handlerRef.current = fn;
-  };
+  }, []);
 
-  return { connected, onMessage };
+  const reconnectNow = useCallback(() => {
+    if (!token) {
+      setConnected(false);
+      return;
+    }
+    setConnected(false);
+    reconnect(token);
+  }, [token]);
+
+  return { connected, onMessage, reconnect: reconnectNow };
 }

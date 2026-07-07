@@ -41,10 +41,19 @@ export async function listCustomers(params: { keyword?: string; page?: number; p
 
 export async function exportCustomers(): Promise<void> {
   const blob = await http.post<unknown, Blob>('/customers/export', {}, { responseType: 'blob' });
+  downloadBlob(blob, `customers_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+export async function downloadCustomerImportTemplate(): Promise<void> {
+  const blob = await http.get<unknown, Blob>('/customers/import-template', { responseType: 'blob' });
+  downloadBlob(blob, `customer_import_template_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = `customers_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  anchor.download = fileName;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();

@@ -1,4 +1,4 @@
-import { CheckOutlined, PlusOutlined, WifiOutlined } from '@ant-design/icons';
+import { EyeOutlined, PlusOutlined, ReloadOutlined, WifiOutlined } from '@ant-design/icons';
 import { ModalForm, ProColumns, ProFormSelect, ProFormText, ProFormTextArea, ProTable, type ActionType } from '@ant-design/pro-components';
 import { Badge, Button, Space, Tag, Tooltip } from 'antd';
 import { message } from '../../../utils/message';
@@ -11,6 +11,8 @@ import {
   unreadNotificationCount,
   type NotificationRow,
 } from '../../../api/collaboration';
+import { NotificationDetailModal } from '../components/NotificationDetailModal';
+import { notificationNeedsRead, notificationReadPlaceholder } from '../notificationDetail';
 import { useNotificationWebSocket } from '../../../hooks/useNotificationWebSocket';
 import { operationColumnProps } from '../../../utils/tableColumns';
 
@@ -18,8 +20,9 @@ export function NotificationCenterPage() {
   const actionRef = useRef<ActionType>(null);
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [selectedNotification, setSelectedNotification] = useState<NotificationRow | null>(null);
 
-  const { connected: wsConnected, onMessage } = useNotificationWebSocket();
+  const { connected: wsConnected, onMessage, reconnect } = useNotificationWebSocket();
 
   useEffect(() => {
     void refreshUnread();
@@ -39,6 +42,16 @@ export function NotificationCenterPage() {
     setUnread(await unreadNotificationCount());
   }
 
+  async function openNotificationDetail(row: NotificationRow) {
+    setSelectedNotification(row);
+    if (notificationNeedsRead(row)) {
+      await markNotificationRead(row.id);
+      setSelectedNotification({ ...row, read_at: notificationReadPlaceholder() });
+      await refreshUnread();
+      actionRef.current?.reload();
+    }
+  }
+
   const columns: ProColumns<NotificationRow>[] = [
     {
       title: '状态',
@@ -54,35 +67,26 @@ export function NotificationCenterPage() {
     {
       title: '操作',
       ...operationColumnProps<NotificationRow>(120),
-      render: (_, row) =>
-        row.read_at ? null : (
-          <Button
-            type="link"
-            size="small"
-            icon={<CheckOutlined />}
-            onClick={async () => {
-              await markNotificationRead(row.id);
-              message.success('已标记为已读');
-              await refreshUnread();
-              actionRef.current?.reload();
-            }}
-          >
-            已读
-          </Button>
-        ),
+      render: (_, row) => (
+        <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => void openNotificationDetail(row)}>
+          详情
+        </Button>
+      ),
     },
   ];
 
   return (
     <div>
       <Space align="center" className="page-status-strip">
-        <span>未读</span>
-        <Badge count={unread} overflowCount={99} />
+        <span>未读消息：{unread} 条</span>
         <Tooltip title={wsConnected ? '实时连接正常' : '实时连接已断开'}>
           <Tag color={wsConnected ? 'green' : 'red'} style={{ marginLeft: 8 }}>
-            <WifiOutlined /> {wsConnected ? '已连接' : '未连接'}
+            <WifiOutlined /> 实时连接：{wsConnected ? '已连接' : '已断开'}
           </Tag>
         </Tooltip>
+        <Button size="small" icon={<ReloadOutlined />} onClick={reconnect}>
+          重连
+        </Button>
       </Space>
       <ProTable<NotificationRow>
         actionRef={actionRef}
@@ -137,6 +141,11 @@ export function NotificationCenterPage() {
         <ProFormText name="source_module" label="来源模块" rules={[{ required: true }]} />
         <ProFormTextArea name="content" label="内容" fieldProps={{ rows: 4 }} rules={[{ required: true }]} />
       </ModalForm>
+      <NotificationDetailModal
+        open={Boolean(selectedNotification)}
+        notification={selectedNotification}
+        onClose={() => setSelectedNotification(null)}
+      />
     </div>
   );
 }

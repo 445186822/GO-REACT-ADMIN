@@ -8,12 +8,13 @@ import {
   ProTable,
   type ActionType,
 } from '@ant-design/pro-components';
-import { App, Button, Space, Tag, Tooltip, Upload } from 'antd';
+import { Alert, App, Button, Space, Tag, Tooltip } from 'antd';
 import { message } from '../../../utils/message';
 import { useRef, useState } from 'react';
 import {
   createCustomer,
   deleteCustomer,
+  downloadCustomerImportTemplate,
   exportCustomers,
   importCustomers,
   listCustomers,
@@ -22,9 +23,15 @@ import {
   type CustomerRow,
 } from '../../../api/customers';
 import { BackendDownloadButton } from '../../../components/BackendDownloadButton';
+import { ExcelImportModal } from '../../../components/ExcelImportModal';
 import { Permission } from '../../../components/Permission';
 import { operationColumnProps } from '../../../utils/tableColumns';
-import { customerImportFailureDetail, customerImportSummary } from '../customerImportView';
+import {
+  customerImportFailureDetail,
+  customerImportSummary,
+  customerImportTemplateColumns,
+  customerImportTemplateRows,
+} from '../customerImportView';
 
 export function CustomerListPage() {
   const { modal } = App.useApp();
@@ -33,6 +40,9 @@ export function CustomerListPage() {
   const [editing, setEditing] = useState<CustomerRow | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [importing, setImporting] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<Awaited<ReturnType<typeof importCustomers>> | null>(null);
 
   const columns: ProColumns<CustomerRow>[] = [
     { title: '客户名称', dataIndex: 'name', copyable: true, width: 160 },
@@ -120,15 +130,27 @@ export function CustomerListPage() {
     message.success('客户 Excel 已生成');
   }
 
-  async function handleImportCustomers(file: File) {
+  async function downloadImportTemplate() {
+    await downloadCustomerImportTemplate();
+    message.success('客户导入模板已下载');
+  }
+
+  async function submitImportCustomers() {
+    if (!importFile) {
+      message.warning('请选择 Excel 文件');
+      return;
+    }
     setImporting(true);
     try {
-      const result = await importCustomers(file);
+      const result = await importCustomers(importFile);
       const detail = customerImportFailureDetail(result);
+      setImportResult(result);
       if (result.failed > 0) {
         message.warning(detail ? `${customerImportSummary(result)}\n${detail}` : customerImportSummary(result), 8);
       } else {
         message.success(customerImportSummary(result));
+        setImportModalOpen(false);
+        setImportFile(null);
       }
       actionRef.current?.reload();
     } finally {
@@ -190,18 +212,15 @@ export function CustomerListPage() {
             导出 Excel
           </BackendDownloadButton>,
           <Permission code="customer:create" key="import">
-            <Upload
-              accept=".xlsx"
-              showUploadList={false}
-              beforeUpload={(file) => {
-                void handleImportCustomers(file);
-                return false;
+            <Button
+              icon={<UploadOutlined />}
+              onClick={() => {
+                setImportModalOpen(true);
+                setImportResult(null);
               }}
             >
-              <Button icon={<UploadOutlined />} loading={importing}>
-                导入 Excel
-              </Button>
-            </Upload>
+              导入 Excel
+            </Button>
           </Permission>,
           <Permission code="customer:create" key="create">
             <Button
@@ -253,6 +272,39 @@ export function CustomerListPage() {
         />
         <ProFormTextArea name="remark" label="备注" fieldProps={{ rows: 3 }} />
       </ModalForm>
+
+      <ExcelImportModal
+        open={importModalOpen}
+        title="导入客户 Excel"
+        description="客户名称为必填字段；级别支持重点客户、普通客户、潜在客户；状态支持有效、停用。"
+        templateDescription="模板由后端生成，字段顺序和导入解析保持一致，包含 3 行可直接试导入的示例数据。"
+        sampleColumns={[...customerImportTemplateColumns]}
+        sampleRows={customerImportTemplateRows}
+        file={importFile}
+        importing={importing}
+        onDownloadTemplate={downloadImportTemplate}
+        onFileChange={(file) => {
+          setImportFile(file);
+          setImportResult(null);
+        }}
+        onSubmit={submitImportCustomers}
+        onCancel={() => {
+          setImportModalOpen(false);
+          setImportFile(null);
+          setImportResult(null);
+        }}
+        result={
+          importResult ? (
+            <Alert
+              style={{ whiteSpace: 'pre-line' }}
+              type={importResult.failed > 0 ? 'warning' : 'success'}
+              showIcon
+              message={customerImportSummary(importResult)}
+              description={customerImportFailureDetail(importResult) || '所有客户已导入。'}
+            />
+          ) : null
+        }
+      />
     </div>
   );
 }

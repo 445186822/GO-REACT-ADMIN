@@ -14,14 +14,14 @@ Do not add placeholder routes. If a module is not backed by real database tables
 - `/dashboard`: dashboard statistics from backend APIs.
 - `/system/users`: user list, create, update, soft delete, reset password, and export.
 - `/system/roles`: role list, role menu assignment, and export.
-- `/system/menus`: menu and permission list.
+- `/system/menus`: tree-structured menu and permission management with create, update, delete, and export actions.
 - `/system/departments`: department list.
 - `/system/data-dict`: dictionary types and dictionary items.
 - `/system/recycle-bin`: restore, purge one, and purge all recycled records.
 - `/system/monitor`: system and database monitor overview.
 - `/system/scheduler`: task CRUD, enable/disable, manual run, and execution history.
 - `/system/architecture`: architecture overview page.
-- `/business/customers`: customer CRUD, data-scope API integration, backend XLSX export, and XLSX import.
+- `/business/customers`: customer CRUD, data-scope API integration, backend XLSX export, backend import-template download, and XLSX import.
 - `/collaboration/todos`: current user's actionable workflow approval tasks.
 - `/collaboration/notifications`: persisted notification list, unread state, read actions, create notification, and WebSocket unread updates.
 - `/collaboration/message-templates`: message template CRUD with JSON variables.

@@ -72,6 +72,16 @@ func TestLoadReadsRuntimeStartupFlags(t *testing.T) {
 	}
 }
 
+func TestConfigAllowedOriginsSplitsConfiguredList(t *testing.T) {
+	cfg := Config{AllowedOrigin: " http://127.0.0.1:15173, http://localhost:15173 "}
+
+	got := cfg.AllowedOrigins()
+
+	if len(got) != 2 || got[0] != "http://127.0.0.1:15173" || got[1] != "http://localhost:15173" {
+		t.Fatalf("AllowedOrigins() = %#v, want trimmed origins", got)
+	}
+}
+
 func TestLoadEnablesRuntimeStartupFlagsByDefault(t *testing.T) {
 	cfg := Load()
 

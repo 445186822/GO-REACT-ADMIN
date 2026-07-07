@@ -31,6 +31,21 @@ type Config struct {
 	RabbitMQManagementPass string
 }
 
+func (c Config) AllowedOrigins() []string {
+	parts := strings.Split(c.AllowedOrigin, ",")
+	origins := make([]string, 0, len(parts))
+	for _, part := range parts {
+		origin := strings.TrimSpace(part)
+		if origin != "" {
+			origins = append(origins, origin)
+		}
+	}
+	if len(origins) == 0 {
+		return []string{"http://localhost:5173"}
+	}
+	return origins
+}
+
 func Load() Config {
 	loadDotEnv(".env")
 

@@ -26,13 +26,17 @@ func PermissionForRequest(method string, rawPath string) string {
 	case strings.HasPrefix(path, "/roles/") && strings.HasSuffix(path, "/menus"):
 		return permissionByMethod(method, "role:view", "role:update", "role:update", "role:update")
 	case path == "/menus":
-		return "menu:view"
+		return permissionByMethod(method, "menu:view", "menu:create", "", "")
+	case path == "/menus/:id":
+		return permissionByMethod(method, "menu:view", "", "menu:update", "menu:delete")
 	case path == "/departments":
 		return "department:view"
 	case path == "/customers":
 		return permissionByMethod(method, "customer:view", "customer:create", "", "")
 	case path == "/customers/export":
 		return "customer:view"
+	case path == "/customers/import-template":
+		return "customer:create"
 	case path == "/customers/import":
 		return "customer:create"
 	case path == "/customers/:id":

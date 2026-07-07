@@ -16,6 +16,15 @@ type ImportResult struct {
 	Errors  []ImportFailure `json:"errors"`
 }
 
+func customerImportTemplateRows() [][]string {
+	return [][]string{
+		{"客户名称", "级别", "手机", "邮箱", "状态", "备注"},
+		{"上海示例科技有限公司", "重点客户", "13800138000", "contact@example.com", "有效", "模板示例：重点客户"},
+		{"杭州未来制造有限公司", "普通客户", "13900139000", "sales@example.com", "有效", "模板示例：普通客户"},
+		{"深圳潜在合作方", "潜在客户", "13700137000", "lead@example.com", "停用", "模板示例：潜在客户"},
+	}
+}
+
 func parseCustomerImportRows(rows [][]string) ([]Row, []ImportFailure) {
 	if len(rows) < 2 {
 		return nil, []ImportFailure{{Row: 1, Reason: "Excel 至少需要表头和一行数据"}}

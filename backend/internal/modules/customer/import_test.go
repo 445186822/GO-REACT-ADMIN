@@ -1,6 +1,11 @@
 package customer
 
-import "testing"
+import (
+	"testing"
+
+	"enterprise-demo/backend/internal/exportxlsx"
+	"enterprise-demo/backend/internal/importxlsx"
+)
 
 func TestParseCustomerImportRowsMapsExportedHeaders(t *testing.T) {
 	rows := [][]string{
@@ -49,5 +54,26 @@ func TestParseCustomerImportRowsReturnsRowFailures(t *testing.T) {
 	}
 	if failures[1].Row != 3 || failures[1].Reason == "" {
 		t.Fatalf("failures[1] = %#v, want invalid level failure on row 3", failures[1])
+	}
+}
+
+func TestCustomerImportTemplateCanBeReadAndParsed(t *testing.T) {
+	content, err := exportxlsx.Build("Customers", customerImportTemplateRows())
+	if err != nil {
+		t.Fatalf("Build() error = %v", err)
+	}
+	rows, err := importxlsx.Read(content)
+	if err != nil {
+		t.Fatalf("Read() error = %v", err)
+	}
+	customers, failures := parseCustomerImportRows(rows)
+	if len(failures) != 0 {
+		t.Fatalf("failures = %#v, want none", failures)
+	}
+	if len(customers) != 3 {
+		t.Fatalf("len(customers) = %d, want 3", len(customers))
+	}
+	if customers[0].Name != "上海示例科技有限公司" || customers[2].Status != "DISABLED" {
+		t.Fatalf("customers = %#v, want parsed sample rows", customers)
 	}
 }

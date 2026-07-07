@@ -33,6 +33,7 @@ func (h *Handler) Register(g *echo.Group) {
 	group.GET("", h.List)
 	group.POST("", h.Create)
 	group.POST("/export", h.Export)
+	group.GET("/import-template", h.ImportTemplate)
 	group.POST("/import", h.Import)
 	group.PUT("/:id", h.Update)
 	group.DELETE("/:id", h.Delete)
@@ -165,6 +166,16 @@ LIMIT 10000`, req.Keyword, scope, deptID, userID)
 	return c.Blob(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", content)
 }
 
+func (h *Handler) ImportTemplate(c echo.Context) error {
+	content, err := exportxlsx.Build("Customers", customerImportTemplateRows())
+	if err != nil {
+		return err
+	}
+	filename := fmt.Sprintf("customer_import_template_%s.xlsx", time.Now().Format("20060102"))
+	c.Response().Header().Set(echo.HeaderContentDisposition, fmt.Sprintf(`attachment; filename="%s"`, filename))
+	return c.Blob(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", content)
+}
+
 func (h *Handler) Import(c echo.Context) error {
 	userID := middleware.CurrentUserID(c)
 	fileHeader, err := c.FormFile("file")
@@ -188,9 +199,9 @@ func (h *Handler) Import(c echo.Context) error {
 		return response.NewError(http.StatusBadRequest, "VALIDATION_ERROR", "invalid xlsx file")
 	}
 	customers, failures := parseCustomerImportRows(rows)
-	result := ImportResult{Success: len(customers), Failed: len(failures), Errors: failures}
-	result.Total = result.Success + result.Failed
 	if len(customers) == 0 {
+		result := ImportResult{Success: 0, Failed: len(failures), Errors: failures}
+		result.Total = result.Success + result.Failed
 		return response.OK(c, result)
 	}
 
@@ -198,22 +209,19 @@ func (h *Handler) Import(c echo.Context) error {
 	if err := h.db.QueryRow(c.Request().Context(), `SELECT department_id FROM sys_users WHERE id = $1`, userID).Scan(&deptID); err != nil {
 		return err
 	}
-	tx, err := h.db.Begin(c.Request().Context())
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(c.Request().Context())
+	imported := 0
 	for _, customer := range customers {
-		if _, err := tx.Exec(c.Request().Context(), `
+		if _, err := h.db.Exec(c.Request().Context(), `
 INSERT INTO biz_customers (name, level, phone, email, owner_id, department_id, status, remark)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 			customer.Name, customer.Level, customer.Phone, customer.Email, userID, deptID, customer.Status, customer.Remark); err != nil {
-			return err
+			failures = append(failures, ImportFailure{Row: 0, Reason: fmt.Sprintf("客户 %s 保存失败：%s", customer.Name, err.Error())})
+			continue
 		}
+		imported++
 	}
-	if err := tx.Commit(c.Request().Context()); err != nil {
-		return err
-	}
+	result := ImportResult{Success: imported, Failed: len(failures), Errors: failures}
+	result.Total = result.Success + result.Failed
 	return response.OK(c, result)
 }
 

@@ -619,6 +619,48 @@ body {
   border-top: 1px solid #eef2f6;
 }
 
+.notification-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid #eef2f6;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.notification-detail-title-block {
+  min-width: 0;
+}
+
+.notification-detail-title {
+  margin: 0 0 6px !important;
+  line-height: 1.4 !important;
+  word-break: break-word;
+}
+
+.notification-detail-content {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #eef2f6;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.notification-detail-body {
+  min-height: 120px;
+  margin-bottom: 0 !important;
+  padding: 12px;
+  border-radius: 6px;
+  color: #344054;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #f9fafb;
+}
+
 .app-loading {
   min-height: 100vh;
   display: flex;

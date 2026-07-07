@@ -41,6 +41,8 @@ import { changePasswordApi } from '../api/auth';
 import { listNotifications, markAllNotificationsRead, markNotificationRead, unreadNotificationCount, type NotificationRow } from '../api/collaboration';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { FloatingAIAssistant } from '../components/FloatingAIAssistant';
+import { NotificationDetailModal } from '../features/collaboration/components/NotificationDetailModal';
+import { notificationNeedsRead, notificationReadPlaceholder } from '../features/collaboration/notificationDetail';
 import { useNotificationWebSocket } from '../hooks/useNotificationWebSocket';
 import { useAppearanceStore, type ContentPadding, type Density, type HeaderStyle, type LayoutMode, type PageTone, type SidebarTheme, type TabStyle } from '../store/appearanceStore';
 import { type MenuNode, useAuthStore } from '../store/authStore';
@@ -61,6 +63,7 @@ export function BasicLayout() {
   const [recentNotifications, setRecentNotifications] = useState<NotificationRow[]>([]);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<NotificationRow | null>(null);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
@@ -293,6 +296,7 @@ export function BasicLayout() {
 
   const openNotificationCenter = () => {
     setNotificationOpen(false);
+    setSelectedNotification(null);
     navigate('/collaboration/notifications');
   };
 
@@ -304,11 +308,15 @@ export function BasicLayout() {
   };
 
   const handleNotificationClick = async (row: NotificationRow) => {
-    if (!row.read_at) {
+    setNotificationOpen(false);
+    setSelectedNotification(row);
+    if (notificationNeedsRead(row)) {
       await markNotificationRead(row.id);
+      const readRow = { ...row, read_at: notificationReadPlaceholder() };
+      setSelectedNotification(readRow);
+      setRecentNotifications((items) => items.map((item) => (item.id === row.id ? readRow : item)));
       await refreshNotificationSummary();
     }
-    openNotificationCenter();
   };
 
   const handleMarkAllNotificationsRead = async () => {
@@ -585,6 +593,12 @@ export function BasicLayout() {
               <Outlet key={`${location.pathname}:${pageRefreshKey}`} />
             </ErrorBoundary>
           </div>
+          <NotificationDetailModal
+            open={Boolean(selectedNotification)}
+            notification={selectedNotification}
+            onClose={() => setSelectedNotification(null)}
+            onOpenCenter={openNotificationCenter}
+          />
           <Modal
             title="修改密码"
             open={passwordOpen}

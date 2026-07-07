@@ -141,6 +141,28 @@ paths:
       responses:
         "200":
           description: Menus
+    post:
+      summary: Create a menu or permission button
+      responses:
+        "201":
+          description: Created menu ID
+  /menus/{id}:
+    put:
+      summary: Update a menu or permission button
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
+    delete:
+      summary: Soft delete an unused menu or permission button
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Deleted
+        "409":
+          description: Menu has child items
   /departments:
     get:
       summary: List departments
@@ -164,6 +186,17 @@ paths:
       responses:
         "200":
           description: XLSX file stream
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+  /customers/import-template:
+    get:
+      summary: Download a backend-generated customer import template XLSX
+      responses:
+        "200":
+          description: XLSX template stream with sample rows
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:

@@ -10,7 +10,7 @@ function formatValue(value: unknown, key: string): unknown {
     return value.map((item) => formatValue(item, key));
   }
 
-  if (value && typeof value === 'object') {
+  if (isPlainObject(value)) {
     return Object.fromEntries(
       Object.entries(value).map(([entryKey, entryValue]) => [
         entryKey,
@@ -24,6 +24,13 @@ function formatValue(value: unknown, key: string): unknown {
   }
 
   return value;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  return Object.getPrototypeOf(value) === Object.prototype;
 }
 
 function isTimeField(key: string): boolean {
