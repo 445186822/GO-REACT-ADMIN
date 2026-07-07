@@ -464,9 +464,9 @@ body {
   max-width: 92px;
   height: 28px;
   padding: 0 10px;
-  border: 1px solid #e4e7ec;
-  border-radius: 999px;
-  background: #f9fafb;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
   color: #475467;
   cursor: pointer;
   font-size: 12px;
@@ -479,7 +479,6 @@ body {
 }
 
 .role-menu:hover {
-  border-color: #1677ff;
   color: #1677ff;
   background: #e6f4ff;
 }
@@ -1663,4 +1662,50 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-top: 8px;
+}
+
+.menu-icon-select-popup .rc-virtual-list-holder-inner {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 8px;
+  padding: 8px;
+}
+
+.menu-icon-select-popup .ant-select-item {
+  min-height: 88px;
+  padding: 0;
+  border-radius: 8px;
+}
+
+.menu-icon-select-popup .ant-select-item-option-content {
+  min-width: 0;
+  width: 100%;
+}
+
+.menu-icon-option {
+  display: flex;
+  min-width: 0;
+  min-height: 88px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.menu-icon-option-preview {
+  font-size: 22px;
+  line-height: 1;
+  color: #1677ff;
+}
+
+.menu-icon-option-name {
+  max-width: 100%;
+  overflow: hidden;
+  color: #344054;
+  font-size: 12px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

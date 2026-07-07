@@ -2,8 +2,8 @@ import { DeleteOutlined, EyeOutlined, UploadOutlined } from '@ant-design/icons';
 import { ProColumns, ProTable, type ActionType } from '@ant-design/pro-components';
 import { App, Button, Image, Modal, Space, Tag, Typography, Upload } from 'antd';
 import { message } from '../../../utils/message';
-import { useRef, useState } from 'react';
-import { deleteFile, downloadFile, listFiles, uploadFile, type FileRow } from '../../../api/files';
+import { useEffect, useRef, useState } from 'react';
+import { deleteFile, downloadFile, listFiles, uploadFile, createFileObjectUrl, type FileRow } from '../../../api/files';
 import { Permission } from '../../../components/Permission';
 import { BackendDownloadButton } from '../../../components/BackendDownloadButton';
 import { ExportButton } from '../../../components/ExportButton';
@@ -16,6 +16,8 @@ export function FileCenterPage() {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<FileRow | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const columns: ProColumns<FileRow>[] = [
     {
@@ -40,7 +42,7 @@ export function FileCenterPage() {
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setPreviewFile(row)}>
             预览
           </Button>
-          <BackendDownloadButton type="link" size="small" onClick={() => handleDownload(row)}>
+          <BackendDownloadButton type="link" size="small" showBadge={false} onClick={() => handleDownload(row)}>
             下载
           </BackendDownloadButton>
           <Permission code="file:delete">
@@ -75,12 +77,39 @@ export function FileCenterPage() {
     }
   }
 
-  function getFileUrl(row: FileRow): string {
-    return `/api/v1/files/${row.id}/download`;
-  }
-
   function isImage(mimeType: string): boolean {
     return mimeType.startsWith('image/');
+  }
+
+  // Fetch preview image as blob URL with auth, so the <Image> tag can display it
+  useEffect(() => {
+    if (!previewFile || !isImage(previewFile.mime_type)) {
+      setPreviewUrl('');
+      return;
+    }
+    let cancelled = false;
+    setPreviewLoading(true);
+    createFileObjectUrl(previewFile.id)
+      .then((url) => {
+        if (!cancelled) setPreviewUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) message.error('预览加载失败');
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [previewFile]);
+
+  function closePreview() {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewFile(null);
+    setPreviewUrl('');
   }
 
   async function exportFiles() {
@@ -132,28 +161,7 @@ export function FileCenterPage() {
                 setUploading(true);
                 setUploadProgress(0);
                 try {
-                  const formData = new FormData();
-                  formData.append('file', file as File);
-                  const xhr = new XMLHttpRequest();
-                  xhr.open('POST', '/api/v1/files/upload');
-                  xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('access_token') || ''}`);
-                  xhr.upload.onprogress = (e) => {
-                    if (e.lengthComputable) {
-                      const pct = Math.round((e.loaded / e.total) * 100);
-                      setUploadProgress(pct);
-                    }
-                  };
-                  await new Promise<void>((resolve, reject) => {
-                    xhr.onload = () => {
-                      if (xhr.status >= 200 && xhr.status < 300) {
-                        resolve();
-                      } else {
-                        reject(new Error('上传失败'));
-                      }
-                    };
-                    xhr.onerror = () => reject(new Error('上传失败'));
-                    xhr.send(formData);
-                  });
+                  await uploadFile(file as File, (pct) => setUploadProgress(pct));
                   message.success('文件已上传');
                   actionRef.current?.reload();
                   onSuccess?.({});
@@ -177,19 +185,29 @@ export function FileCenterPage() {
       <Modal
         title={previewFile?.original_name}
         open={Boolean(previewFile)}
-        onCancel={() => setPreviewFile(null)}
+        onCancel={closePreview}
         footer={null}
         width={720}
       >
         {previewFile && (
           <div style={{ textAlign: 'center' }}>
             {isImage(previewFile.mime_type) ? (
-              <Image
-                src={getFileUrl(previewFile)}
-                alt={previewFile.original_name}
-                style={{ maxWidth: '100%' }}
-                preview={false}
-              />
+              previewLoading ? (
+                <div style={{ padding: 40 }}>
+                  <Typography.Text type="secondary">加载预览中...</Typography.Text>
+                </div>
+              ) : previewUrl ? (
+                <Image
+                  src={previewUrl}
+                  alt={previewFile.original_name}
+                  style={{ maxWidth: '100%' }}
+                  preview={false}
+                />
+              ) : (
+                <div style={{ padding: 40 }}>
+                  <Typography.Text type="secondary">预览加载失败</Typography.Text>
+                </div>
+              )
             ) : (
               <div style={{ padding: 40 }}>
                 <EyeOutlined style={{ fontSize: 48, color: '#999', marginBottom: 16 }} />

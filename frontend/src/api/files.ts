@@ -18,11 +18,18 @@ export async function listFiles(params: { keyword?: string; page?: number; page_
   return res.data;
 }
 
-export async function uploadFile(file: File): Promise<{ id: number }> {
+export async function uploadFile(
+  file: File,
+  onProgress?: (pct: number) => void,
+): Promise<{ id: number }> {
   const formData = new FormData();
   formData.append('file', file);
   const res = await http.post<unknown, { data: { id: number } }>('/files/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (e) => {
+      if (onProgress && e.total) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    },
   });
   return res.data;
 }

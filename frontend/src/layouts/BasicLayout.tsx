@@ -1,41 +1,15 @@
 import {
-  ApartmentOutlined,
-  ApiOutlined,
-  AppstoreOutlined,
-  AuditOutlined,
   BellOutlined,
-  BookOutlined,
-  BranchesOutlined,
-  CheckSquareOutlined,
-  ClockCircleOutlined,
-  CloudUploadOutlined,
-  ContactsOutlined,
   ControlOutlined,
-  DashboardOutlined,
-  DatabaseOutlined,
-  DeleteOutlined,
-  FileSearchOutlined,
-  FolderOpenOutlined,
-  FolderOutlined,
   LockOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
-  MenuOutlined,
   MenuUnfoldOutlined,
-  MessageOutlined,
-  ReadOutlined,
-  RadarChartOutlined,
   ReloadOutlined,
-  RobotOutlined,
-  ScheduleOutlined,
-  SettingOutlined,
-  ShoppingCartOutlined,
-  TeamOutlined,
   UserOutlined,
-  WechatOutlined,
 } from '@ant-design/icons';
 import { Avatar, Badge, Breadcrumb, Button, ColorPicker, Divider, Drawer, Dropdown, Empty, Form, Input, Layout, Menu, Modal, Popover, Segmented, Select, Slider, Space, Spin, Switch, Tabs, Typography, type MenuProps } from 'antd';
-import { useEffect, useMemo, useState, type ReactNode, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { changePasswordApi } from '../api/auth';
 import { listNotifications, markAllNotificationsRead, markNotificationRead, unreadNotificationCount, type NotificationRow } from '../api/collaboration';
@@ -43,6 +17,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { FloatingAIAssistant } from '../components/FloatingAIAssistant';
 import { NotificationDetailModal } from '../features/collaboration/components/NotificationDetailModal';
 import { notificationNeedsRead, notificationReadPlaceholder } from '../features/collaboration/notificationDetail';
+import { renderMenuIconNode } from '../features/menu/menuIcons';
 import { useNotificationWebSocket } from '../hooks/useNotificationWebSocket';
 import { useAppearanceStore, type ContentPadding, type Density, type HeaderStyle, type LayoutMode, type PageTone, type SidebarTheme, type TabStyle } from '../store/appearanceStore';
 import { type MenuNode, useAuthStore } from '../store/authStore';
@@ -509,7 +484,6 @@ export function BasicLayout() {
                   <Avatar size={32} icon={<UserOutlined />} />
                   <div className="user-menu-info">
                     <span className="user-menu-name">{userDisplayName}</span>
-                    {activeRole && <span className="user-menu-role">{activeRole.name}</span>}
                   </div>
                 </div>
               </Dropdown>
@@ -818,43 +792,11 @@ function AppearanceDrawer({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
-const iconMap: Record<string, ReactNode> = {
-  ApartmentOutlined: <ApartmentOutlined />,
-  ApiOutlined: <ApiOutlined />,
-  AppstoreOutlined: <AppstoreOutlined />,
-  AuditOutlined: <AuditOutlined />,
-  BellOutlined: <BellOutlined />,
-  BookOutlined: <BookOutlined />,
-  BranchesOutlined: <BranchesOutlined />,
-  CheckSquareOutlined: <CheckSquareOutlined />,
-  ClockCircleOutlined: <ClockCircleOutlined />,
-  CloudUploadOutlined: <CloudUploadOutlined />,
-  ContactsOutlined: <ContactsOutlined />,
-  ControlOutlined: <ControlOutlined />,
-  DashboardOutlined: <DashboardOutlined />,
-  DatabaseOutlined: <DatabaseOutlined />,
-  DeleteOutlined: <DeleteOutlined />,
-  FileSearchOutlined: <FileSearchOutlined />,
-  FolderOpenOutlined: <FolderOpenOutlined />,
-  FolderOutlined: <FolderOutlined />,
-  MenuOutlined: <MenuOutlined />,
-  MessageOutlined: <MessageOutlined />,
-  ReadOutlined: <ReadOutlined />,
-  RadarChartOutlined: <RadarChartOutlined />,
-  RobotOutlined: <RobotOutlined />,
-  ScheduleOutlined: <ScheduleOutlined />,
-  SettingOutlined: <SettingOutlined />,
-  ShoppingCartOutlined: <ShoppingCartOutlined />,
-  TeamOutlined: <TeamOutlined />,
-  UserOutlined: <UserOutlined />,
-  WechatOutlined: <WechatOutlined />,
-};
-
 function toMenuItem(menu: MenuNode): any {
   const key = menu.path ? normalizePath(menu.path) : menu.code;
   return {
     key,
-    icon: menu.icon ? (iconMap[menu.icon] ?? <AppstoreOutlined />) : undefined,
+    icon: renderMenuIconNode(menu.icon),
     label: menu.name,
     children: menu.children?.length ? menu.children.map(toMenuItem) : undefined,
     disabled: !menu.path && !menu.children?.length,

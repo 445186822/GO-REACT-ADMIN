@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
+	"path"
 	"strconv"
 	"time"
 
@@ -99,8 +99,8 @@ func (h *Handler) Upload(c echo.Context) error {
 	if err := os.MkdirAll(h.uploadDir, 0o755); err != nil {
 		return err
 	}
-	storedName := randomName() + filepath.Ext(header.Filename)
-	storagePath := filepath.Join(h.uploadDir, storedName)
+	storedName := randomName() + path.Ext(header.Filename)
+	storagePath := path.Join(h.uploadDir, storedName)
 	dst, err := os.Create(storagePath)
 	if err != nil {
 		return err
@@ -140,7 +140,7 @@ FROM sys_files
 WHERE id = $1 AND deleted_at IS NULL`, id).Scan(&originalName, &storagePath); err != nil {
 		return response.NewError(http.StatusNotFound, "RESOURCE_NOT_FOUND", "file not found")
 	}
-	return c.Attachment(storagePath, originalName)
+	return c.Inline(storagePath, originalName)
 }
 
 func (h *Handler) Delete(c echo.Context) error {
