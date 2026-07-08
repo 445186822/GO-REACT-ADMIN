@@ -1,6 +1,6 @@
 import type { ProColumns } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
-import { Dropdown, Empty, Pagination, Spin, Typography } from 'antd';
+import { Empty, Pagination, Spin, Typography } from 'antd';
 import { useMemo, useRef, useState, useEffect, type Key, type ReactNode } from 'react';
 import { useIsMobile } from '../hooks/useIsMobile';
 
@@ -199,7 +199,7 @@ export function ResponsiveProTable<T extends Record<string, any>>(
               const rowKeyValue = typeof rowKey === 'function' ? rowKey(row) : (row as any)[rowKey];
               return (
                 <div className="mobile-record-item" key={rowKeyValue ?? index}>
-                  {/* Header: title (if explicitly marked) + actions */}
+                  {/* Header: first column as title + actions */}
                   <div className="mobile-record-header">
                     {titleCol ? (
                       <Typography.Text className="mobile-record-title" strong ellipsis>
