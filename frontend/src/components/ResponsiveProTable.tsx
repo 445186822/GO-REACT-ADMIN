@@ -199,12 +199,16 @@ export function ResponsiveProTable<T extends Record<string, any>>(
               const rowKeyValue = typeof rowKey === 'function' ? rowKey(row) : (row as any)[rowKey];
               return (
                 <div className="mobile-record-item" key={rowKeyValue ?? index}>
-                  {/* Header — only shown when a column is explicitly marked as title */}
-                  {titleCol && (
+                  {/* Header: title (if explicitly marked) + actions */}
+                  {(titleCol || renderMobileActions) && (
                     <div className="mobile-record-header">
-                      <Typography.Text className="mobile-record-title" strong ellipsis>
-                        {renderCellValue(row, titleCol.col, index)}
-                      </Typography.Text>
+                      {titleCol ? (
+                        <Typography.Text className="mobile-record-title" strong ellipsis>
+                          {renderCellValue(row, titleCol.col, index)}
+                        </Typography.Text>
+                      ) : (
+                        <span />
+                      )}
                       {renderMobileActions?.(row) && (
                         <div className="mobile-record-actions">{renderMobileActions(row)}</div>
                       )}
