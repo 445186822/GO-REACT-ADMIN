@@ -93,12 +93,12 @@ function deriveMobileSlots<T extends Record<string, any>>(
     .filter((s) => s.visible)
     .sort((a, b) => a.priority - b.priority);
 
-  // Title: only when explicitly marked. Never auto-assign.
-  const titleCol = visible.find((s) => s.isTitle) ?? null;
+  // Title: explicitly marked column, or the first visible column as fallback.
+  const explicitTitle = visible.find((s) => s.isTitle);
+  const titleCol = explicitTitle ?? visible[0] ?? null;
 
-  // Fields: all visible, capped. Title column is excluded from fields.
-  const max = titleCol ? maxFields - 1 : maxFields;
-  const fields = visible.filter((s) => !s.isTitle).slice(0, max);
+  // Fields: exclude the title column, cap at maxFields.
+  const fields = visible.filter((s) => s !== titleCol).slice(0, maxFields);
 
   return { titleCol, fields };
 }
@@ -200,20 +200,18 @@ export function ResponsiveProTable<T extends Record<string, any>>(
               return (
                 <div className="mobile-record-item" key={rowKeyValue ?? index}>
                   {/* Header: title (if explicitly marked) + actions */}
-                  {(titleCol || renderMobileActions) && (
-                    <div className="mobile-record-header">
-                      {titleCol ? (
-                        <Typography.Text className="mobile-record-title" strong ellipsis>
-                          {renderCellValue(row, titleCol.col, index)}
-                        </Typography.Text>
-                      ) : (
-                        <span />
-                      )}
-                      {renderMobileActions?.(row) && (
-                        <div className="mobile-record-actions">{renderMobileActions(row)}</div>
-                      )}
-                    </div>
-                  )}
+                  <div className="mobile-record-header">
+                    {titleCol ? (
+                      <Typography.Text className="mobile-record-title" strong ellipsis>
+                        {titleCol.label}：{renderCellValue(row, titleCol.col, index)}
+                      </Typography.Text>
+                    ) : (
+                      <span />
+                    )}
+                    {renderMobileActions?.(row) && (
+                      <div className="mobile-record-actions">{renderMobileActions(row)}</div>
+                    )}
+                  </div>
                   {/* Fields */}
                   <div className="mobile-record-fields">
                     {fields.map((slot) => (
