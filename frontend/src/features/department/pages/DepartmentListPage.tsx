@@ -1,8 +1,9 @@
-﻿import { ProColumns, ProTable } from '@ant-design/pro-components';
+import { ProColumns } from '@ant-design/pro-components';
 import { Tag } from 'antd';
-import { message } from '../../../utils/message';
 import { listDepartments, type DepartmentRow } from '../../../api/departments';
 import { ExportButton } from '../../../components/ExportButton';
+import { ResponsiveProTable } from '../../../components/ResponsiveProTable';
+import { message } from '../../../utils/message';
 import { exportExcel } from '../../../utils/exportExcel';
 
 export function DepartmentListPage() {
@@ -20,8 +21,7 @@ export function DepartmentListPage() {
   async function exportDepartments() {
     const rows = await listDepartments();
     await exportExcel<DepartmentRow>(
-      'departments.xlsx',
-      'Departments',
+      'departments.xlsx', 'Departments',
       [
         { title: 'ID', dataIndex: 'id' },
         { title: '父级 ID', dataIndex: 'parent_id' },
@@ -36,20 +36,16 @@ export function DepartmentListPage() {
 
   return (
     <div>
-      <ProTable<DepartmentRow>
+      <ResponsiveProTable<DepartmentRow>
         rowKey="id"
         columns={columns}
         search={false}
-        request={async () => ({ data: await listDepartments(), success: true })}
+        request={async () => ({ data: await listDepartments(), total: 0, success: true })}
         pagination={false}
         toolBarRender={() => [
-          <ExportButton key="export" onClick={exportDepartments}>
-            导出 Excel
-          </ExportButton>,
+          <ExportButton key="export" onClick={exportDepartments}>导出 Excel</ExportButton>,
         ]}
       />
     </div>
   );
 }
-
-
