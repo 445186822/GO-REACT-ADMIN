@@ -14,6 +14,9 @@ describe('sidebar responsive navigation', () => {
 
   it('uses a drawer menu on narrow side-layout screens instead of keeping the sidebar in the viewport', () => {
     expect(source).toContain('Grid.useBreakpoint()');
+    expect(source).toContain('typeof window !==');
+    expect(source).toContain('viewportWidth <= 768');
+    expect(source).toContain("window.addEventListener('resize', handleResize)");
     expect(source).toContain('isMobileSideLayout');
     expect(source).toContain('mobileMenuOpen');
     expect(source).toContain('className={`mobile-menu-drawer mobile-menu-drawer-${sidebarTheme}`}');
@@ -21,8 +24,10 @@ describe('sidebar responsive navigation', () => {
 
   it('has focused CSS for collapsed sidebar popups and mobile menu layout', () => {
     expect(css).toContain('.mobile-menu-drawer');
-    expect(css).toContain('.app-sider.ant-layout-sider-collapsed');
+    expect(css).toContain('.app-shell-side .app-sider');
     expect(css).toContain('.app-shell-top .app-top-menu');
     expect(css).toContain('.page-body > div');
+    expect(css).not.toContain('.app-sider.ant-layout-sider-collapsed .ant-menu-item');
+    expect(css).not.toContain('padding-inline: 0 !important');
   });
 });

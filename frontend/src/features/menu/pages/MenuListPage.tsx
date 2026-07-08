@@ -1,39 +1,79 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   ModalForm,
-  ProColumns,
   ProFormDigit,
   ProFormSelect,
   ProFormText,
   ProTable,
   type ActionType,
 } from '@ant-design/pro-components';
-import { App, Button, Space, Tag, Typography } from 'antd';
-import { useMemo, useRef, useState } from 'react';
+import { App, Button, Dropdown, Grid, Space, Tag, Typography, type MenuProps } from 'antd';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { message } from '../../../utils/message';
 import { createMenu, deleteMenu, listMenus, updateMenu, type MenuForm, type MenuRow } from '../../../api/menus';
 import { ExportButton } from '../../../components/ExportButton';
+import { MobileRecordList, type MobileListColumn } from '../../../components/MobileRecordList';
 import { Permission } from '../../../components/Permission';
+import { useAuthStore } from '../../../store/authStore';
 import { exportExcel } from '../../../utils/exportExcel';
 import { operationColumnProps } from '../../../utils/tableColumns';
 import { menuIconOptions, renderMenuIconLabel, renderMenuIconOption } from '../menuIcons';
 import { buildMenuTree, menuParentOptions, type MenuTreeRow, typeText } from '../menuView';
 
+type MobileMenuRow = MenuTreeRow & {
+  depth?: number;
+};
+
 export function MenuListPage() {
   const { modal } = App.useApp();
   const actionRef = useRef<ActionType>(null);
+  const screens = Grid.useBreakpoint();
+  const hasPermission = useAuthStore((state) => state.hasPermission);
   const [flatMenus, setFlatMenus] = useState<MenuRow[]>([]);
+  const [mobileMenus, setMobileMenus] = useState<MobileMenuRow[]>([]);
+  const [menuLoading, setMenuLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<MenuRow | null>(null);
   const [formSeed, setFormSeed] = useState<Partial<MenuForm>>({ type: 'page', sort_order: 0 });
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1024));
 
+  const isMobile = screens.md === false || viewportWidth <= 768;
   const parentOptions = useMemo(() => menuParentOptions(flatMenus, editing?.id), [flatMenus, editing?.id]);
 
-  const columns: ProColumns<MenuTreeRow>[] = [
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const fetchMobileMenus = useCallback(async () => {
+    if (!isMobile) {
+      return;
+    }
+    setMenuLoading(true);
+    try {
+      const rows = await listMenus();
+      setFlatMenus(rows);
+      setMobileMenus(flattenMenuTree(buildMenuTree(rows)));
+    } finally {
+      setMenuLoading(false);
+    }
+  }, [isMobile]);
+
+  useEffect(() => {
+    void fetchMobileMenus();
+  }, [fetchMobileMenus]);
+
+  const columns: MobileListColumn<MenuTreeRow>[] = [
     {
       title: '名称',
       dataIndex: 'name',
       width: 240,
+      mobile: { title: true, visible: true, priority: 1 },
       render: (_, row) => (
         <Space size={8}>
           <Typography.Text strong={row.type === 'directory'}>{row.name}</Typography.Text>
@@ -41,17 +81,24 @@ export function MenuListPage() {
         </Space>
       ),
     },
-    { title: '权限编码', dataIndex: 'code', copyable: true },
+    { title: '权限编码', dataIndex: 'code', copyable: true, mobile: { visible: true, priority: 3 } },
     {
       title: '类型',
       dataIndex: 'type',
       width: 100,
       render: (_, row) => <Tag color={typeColor(row.type)}>{typeText(row.type)}</Tag>,
+      mobile: { visible: true, priority: 2 },
     },
-    { title: '路由', dataIndex: 'path' },
-    { title: '组件', dataIndex: 'component', width: 160 },
-    { title: '图标', dataIndex: 'icon', width: 220, render: (_, row) => renderMenuIconLabel(row.icon) },
-    { title: '排序', dataIndex: 'sort_order', width: 80 },
+    { title: '路由', dataIndex: 'path', mobile: { visible: true, priority: 4 } },
+    { title: '组件', dataIndex: 'component', width: 160, mobile: { visible: true, priority: 5 } },
+    {
+      title: '图标',
+      dataIndex: 'icon',
+      width: 220,
+      render: (_, row) => renderMenuIconLabel(row.icon),
+      mobile: { visible: true, priority: 6, render: (row) => renderMenuIconLabel(row.icon) },
+    },
+    { title: '排序', dataIndex: 'sort_order', width: 80, mobile: { visible: true, priority: 7 } },
     {
       title: '操作',
       ...operationColumnProps<MenuTreeRow>(240),
@@ -114,7 +161,7 @@ export function MenuListPage() {
       onOk: async () => {
         await deleteMenu(row.id);
         message.success('菜单已删除');
-        actionRef.current?.reload();
+        reloadMenus();
       },
     });
   }
@@ -137,12 +184,47 @@ export function MenuListPage() {
       message.success(editing ? '菜单已更新' : '菜单已创建');
       setOpen(false);
       setEditing(null);
-      actionRef.current?.reload();
+      reloadMenus();
       return true;
     } catch {
       message.error('保存菜单失败，请检查编码是否重复或父级是否合法');
       return false;
     }
+  }
+
+  function reloadMenus() {
+    actionRef.current?.reload();
+    void fetchMobileMenus();
+  }
+
+  function getMenuActionMenuItems(row: MenuTreeRow): MenuProps['items'] {
+    const items: MenuProps['items'] = [];
+    if (row.type !== 'button' && hasPermission('menu:create')) {
+      items.push({
+        key: 'child',
+        icon: <PlusOutlined />,
+        label: '子项',
+        onClick: () => openCreate(row),
+      });
+    }
+    if (hasPermission('menu:update')) {
+      items.push({
+        key: 'edit',
+        icon: <EditOutlined />,
+        label: '编辑',
+        onClick: () => openEdit(row),
+      });
+    }
+    if (hasPermission('menu:delete')) {
+      items.push({
+        key: 'delete',
+        icon: <DeleteOutlined />,
+        label: '删除',
+        danger: true,
+        onClick: () => confirmDelete(row),
+      });
+    }
+    return items;
   }
 
   async function exportMenus() {
@@ -168,29 +250,59 @@ export function MenuListPage() {
 
   return (
     <div>
-      <ProTable<MenuTreeRow>
-        actionRef={actionRef}
-        rowKey="id"
-        columns={columns}
-        search={false}
-        request={async () => {
-          const rows = await listMenus();
-          setFlatMenus(rows);
-          return { data: buildMenuTree(rows), success: true };
-        }}
-        expandable={{ defaultExpandAllRows: true }}
-        pagination={false}
-        toolBarRender={() => [
-          <Permission code="menu:create" key="create">
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>
-              新增菜单
-            </Button>
-          </Permission>,
-          <ExportButton key="export" onClick={exportMenus}>
-            导出 Excel
-          </ExportButton>,
-        ]}
-      />
+      {isMobile ? (
+        <MobileRecordList<MenuTreeRow>
+          columns={columns}
+          dataSource={mobileMenus}
+          rowKey="id"
+          loading={menuLoading}
+          actions={(row) => {
+            const items = getMenuActionMenuItems(row);
+            if (!items?.length) {
+              return null;
+            }
+            return (
+              <Dropdown menu={{ items }} trigger={['click']} placement="bottomRight">
+                <Button type="text" size="small" className="table-row-more-button" icon={<MoreOutlined />} aria-label="更多操作" />
+              </Dropdown>
+            );
+          }}
+          toolbar={
+            <Space wrap>
+              <Permission code="menu:create">
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>
+                  新增菜单
+                </Button>
+              </Permission>
+              <ExportButton onClick={exportMenus}>导出 Excel</ExportButton>
+            </Space>
+          }
+        />
+      ) : (
+        <ProTable<MenuTreeRow>
+          actionRef={actionRef}
+          rowKey="id"
+          columns={columns}
+          search={false}
+          request={async () => {
+            const rows = await listMenus();
+            setFlatMenus(rows);
+            return { data: buildMenuTree(rows), success: true };
+          }}
+          expandable={{ defaultExpandAllRows: true }}
+          pagination={false}
+          toolBarRender={() => [
+            <Permission code="menu:create" key="create">
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>
+                新增菜单
+              </Button>
+            </Permission>,
+            <ExportButton key="export" onClick={exportMenus}>
+              导出 Excel
+            </ExportButton>,
+          ]}
+        />
+      )}
 
       <ModalForm<MenuForm>
         key={editing ? `edit-${editing.id}` : `create-${formSeed.parent_id ?? 'root'}-${formSeed.type ?? 'page'}`}
@@ -252,4 +364,11 @@ function typeColor(type: MenuRow['type']) {
   if (type === 'directory') return 'blue';
   if (type === 'page') return 'green';
   return 'purple';
+}
+
+function flattenMenuTree(rows: MenuTreeRow[], depth = 0): MobileMenuRow[] {
+  return rows.flatMap((row) => {
+    const current: MobileMenuRow = { ...row, depth };
+    return [current, ...flattenMenuTree(row.children ?? [], depth + 1)];
+  });
 }

@@ -14,4 +14,13 @@ describe('table column helpers', () => {
     expect(operationColumnProps(100).width).toBe(180);
     expect(operationColumnProps(260).width).toBe(260);
   });
+
+  it('can opt out of right fixing and use a compact mobile width', () => {
+    expect(operationColumnProps(64, { fixed: false, minWidth: 56, compact: true })).toMatchObject({
+      width: 64,
+      className: 'table-operation-column table-operation-column-compact',
+    });
+    expect(operationColumnProps(64, { fixed: false, minWidth: 56, compact: true }).valueType).toBeUndefined();
+    expect(operationColumnProps(64, { fixed: false, minWidth: 56, compact: true }).fixed).toBeUndefined();
+  });
 });

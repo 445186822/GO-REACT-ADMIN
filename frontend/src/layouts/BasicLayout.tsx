@@ -42,6 +42,7 @@ export function BasicLayout() {
   const [selectedNotification, setSelectedNotification] = useState<NotificationRow | null>(null);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1024));
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
   const [passwordForm] = Form.useForm<ChangePasswordForm>();
@@ -69,7 +70,8 @@ export function BasicLayout() {
   const pageTitle = currentTrail.at(-1)?.name ?? 'Workspace';
   const breadcrumbItems = [{ title: 'Home' }, ...currentTrail.map((item) => ({ title: item.name }))];
   const userDisplayName = user?.display_name || user?.username || '';
-  const isMobile = screens.md === false;
+  const isMobile = screens.md === false || viewportWidth <= 768;
+  const shouldShowHeaderBreadcrumb = showBreadcrumb && !isMobile;
   const isMobileSideLayout = layoutMode === 'side' && isMobile;
   const isMobileTopLayout = layoutMode === 'top' && isMobile;
   const activeRole = useMemo(
@@ -240,6 +242,16 @@ export function BasicLayout() {
       setOpenKeys(activeMenu.openKeys);
     }
   }, [activeMenu.openKeys, collapsed]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const refreshNotificationSummary = useCallback(async () => {
     setNotificationLoading(true);
@@ -454,7 +466,7 @@ export function BasicLayout() {
                 />
                 <div className="page-heading">
                   <Typography.Text className="page-title">{pageTitle}</Typography.Text>
-                  {showBreadcrumb && <Breadcrumb items={breadcrumbItems} />}
+                  {shouldShowHeaderBreadcrumb && <Breadcrumb items={breadcrumbItems} />}
                 </div>
               </>
             ) : isMobileTopLayout ? (
@@ -466,7 +478,7 @@ export function BasicLayout() {
                 />
                 <div className="page-heading">
                   <Typography.Text className="page-title">{pageTitle}</Typography.Text>
-                  {showBreadcrumb && <Breadcrumb items={breadcrumbItems} />}
+                  {shouldShowHeaderBreadcrumb && <Breadcrumb items={breadcrumbItems} />}
                 </div>
               </>
             ) : (
@@ -499,11 +511,12 @@ export function BasicLayout() {
             )}
             <Popover
               trigger="click"
-              placement="bottomRight"
+              placement={isMobile ? 'bottom' : 'bottomRight'}
               open={notificationOpen}
               onOpenChange={handleNotificationOpenChange}
               content={notificationPanel}
               arrow={false}
+              classNames={{ root: 'notification-popover-overlay' }}
             >
               <Badge count={unreadCount} overflowCount={99} size="small">
                 <Button type="text" icon={<BellOutlined />} aria-label="实时消息" />

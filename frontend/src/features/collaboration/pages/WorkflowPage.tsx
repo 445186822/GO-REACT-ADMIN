@@ -27,7 +27,7 @@ import {
   ProTable,
   type ActionType,
 } from '@ant-design/pro-components';
-import { App, Button, Card, Drawer, Empty, Form, Input, Select, Space, Tabs, Tag, Tooltip, Typography} from 'antd';
+import { App, Button, Card, Drawer, Empty, Form, Grid, Input, Select, Space, Tabs, Tag, Tooltip, Typography } from 'antd';
 import { message } from '../../../utils/message';
 import {
   Background,
@@ -48,7 +48,7 @@ import {
   type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { memo, useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   createWorkflow,
   deleteWorkflow,
@@ -104,6 +104,7 @@ const nodeTypes = { workflowNode: memo(WorkflowGraphNode) };
 
 export function WorkflowPage() {
   const { modal } = App.useApp();
+  const screens = Grid.useBreakpoint();
   const workflowRef = useRef<ActionType>(null);
   const instanceRef = useRef<ActionType>(null);
   const [open, setOpen] = useState(false);
@@ -115,6 +116,8 @@ export function WorkflowPage() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<WorkflowFlowEdge>([]);
   const [activeNodeId, setActiveNodeId] = useState('');
   const [activeEdgeId, setActiveEdgeId] = useState('');
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1024));
+  const isMobile = screens.md === false || viewportWidth <= 768;
 
   const activeNode = useMemo(() => nodes.find((item) => item.id === activeNodeId) ?? null, [activeNodeId, nodes]);
   const activeEdge = useMemo(() => edges.find((item) => item.id === activeEdgeId) ?? null, [activeEdgeId, edges]);
@@ -122,6 +125,16 @@ export function WorkflowPage() {
     () => nodes.map((node) => ({ value: String(node.data.key || node.id), label: String(node.data.name || node.id) })),
     [nodes],
   );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const workflowColumns: ProColumns<WorkflowRow>[] = [
     {
@@ -139,13 +152,15 @@ export function WorkflowPage() {
       title: '分类',
       dataIndex: 'category',
       width: 110,
+      hideInTable: isMobile,
       render: (_, row) => <Tag color="blue">{row.category}</Tag>,
     },
-    { title: '说明', dataIndex: 'description', ellipsis: true, search: false, width: 200 },
+    { title: '说明', dataIndex: 'description', ellipsis: true, search: false, width: 200, hideInTable: isMobile },
     {
       title: '节点/连线',
       width: 110,
       search: false,
+      hideInTable: isMobile,
       render: (_, row) => {
         const definition = normalizeDefinition(row.definition);
         return <Text>{definition.nodes?.length ?? 0} / {definition.edges?.length ?? 0}</Text>;
@@ -161,31 +176,40 @@ export function WorkflowPage() {
         </Tag>
       ),
     },
-    { title: '更新时间', dataIndex: 'updated_at', valueType: 'dateTime', width: 170, search: false },
+    { title: '更新时间', dataIndex: 'updated_at', valueType: 'dateTime', width: 170, search: false, hideInTable: isMobile },
     {
       title: '操作',
-      ...operationColumnProps<WorkflowRow>(320),
+      ...operationColumnProps<WorkflowRow>(isMobile ? 156 : 320),
+      fixed: isMobile ? undefined : 'right',
       render: (_, row) => (
-        <Space wrap={false} className="table-action-buttons">
+        <Space wrap={isMobile} size={isMobile ? 2 : 4} className="table-action-buttons workflow-table-actions">
           <Permission code="workflow:update">
-            <Button type="link" size="small" icon={<ExpandOutlined />} onClick={() => openDesigner(row)}>
-              编排
-            </Button>
+            <Tooltip title={isMobile ? '编排' : undefined}>
+              <Button type="link" size="small" icon={<ExpandOutlined />} aria-label="编排" onClick={() => openDesigner(row)}>
+                {isMobile ? null : '编排'}
+              </Button>
+            </Tooltip>
           </Permission>
           <Permission code="workflow:update">
-            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(row)}>
-              编辑
-            </Button>
+            <Tooltip title={isMobile ? '编辑' : undefined}>
+              <Button type="link" size="small" icon={<EditOutlined />} aria-label="编辑" onClick={() => openEdit(row)}>
+                {isMobile ? null : '编辑'}
+              </Button>
+            </Tooltip>
           </Permission>
           <Permission code="workflow:run">
-            <Button type="link" size="small" icon={<PlayCircleOutlined />} onClick={() => run(row)}>
-              运行
-            </Button>
+            <Tooltip title={isMobile ? '运行' : undefined}>
+              <Button type="link" size="small" icon={<PlayCircleOutlined />} aria-label="运行" onClick={() => run(row)}>
+                {isMobile ? null : '运行'}
+              </Button>
+            </Tooltip>
           </Permission>
           <Permission code="workflow:delete">
-            <Button type="link" danger size="small" icon={<DeleteOutlined />} onClick={() => confirmDelete(row)}>
-              删除
-            </Button>
+            <Tooltip title={isMobile ? '删除' : undefined}>
+              <Button type="link" danger size="small" icon={<DeleteOutlined />} aria-label="删除" onClick={() => confirmDelete(row)}>
+                {isMobile ? null : '删除'}
+              </Button>
+            </Tooltip>
           </Permission>
         </Space>
       ),
@@ -199,6 +223,7 @@ export function WorkflowPage() {
       dataIndex: 'definition_name',
       width: 160,
       search: false,
+      hideInTable: isMobile,
       render: (_, row) => <Tag>{row.definition_name}</Tag>,
     },
     {
@@ -221,7 +246,7 @@ export function WorkflowPage() {
       },
     },
     { title: '开始时间', dataIndex: 'started_at', valueType: 'dateTime', width: 170, search: false },
-    { title: '结束时间', dataIndex: 'ended_at', valueType: 'dateTime', width: 170, search: false },
+    { title: '结束时间', dataIndex: 'ended_at', valueType: 'dateTime', width: 170, search: false, hideInTable: isMobile },
   ];
 
   const onConnect = useCallback(
@@ -430,13 +455,14 @@ export function WorkflowPage() {
   }
 
   return (
-    <div style={{ paddingBottom: 24 }}>
+    <div className="workflow-page">
       <Tabs
+        className="workflow-page-tabs"
         defaultActiveKey="definitions"
         tabBarExtraContent={
           <Permission code="workflow:update">
             <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setOpen(true); }}>
-              新增工作流
+              {isMobile ? '新增' : '新增工作流'}
             </Button>
           </Permission>
         }
@@ -449,7 +475,7 @@ export function WorkflowPage() {
                 actionRef={workflowRef}
                 rowKey="id"
                 columns={workflowColumns}
-                scroll={{ x: 'max-content' }}
+                scroll={{ x: isMobile ? 560 : 'max-content' }}
                 request={async (params) => {
                   const data = await listWorkflows({
                     keyword: typeof params.name === 'string' ? params.name : undefined,
@@ -474,6 +500,7 @@ export function WorkflowPage() {
                 actionRef={instanceRef}
                 rowKey="id"
                 columns={instanceColumns}
+                scroll={{ x: isMobile ? 520 : 'max-content' }}
                 request={async () => ({ data: await listWorkflowInstances(), success: true })}
                 search={false}
                 options={{ reload: true }}
@@ -486,18 +513,18 @@ export function WorkflowPage() {
       <Drawer
         className="workflow-flow-drawer"
         title={
-          <Space>
+          <Space className="workflow-flow-drawer-title">
             <BranchesOutlined />
-            <span>工作流可视化编排 - {selectedWorkflow?.name}</span>
+            <span className="workflow-flow-drawer-title-text">工作流可视化编排 - {selectedWorkflow?.name}</span>
           </Space>
         }
         open={designerOpen}
         onClose={() => setDesignerOpen(false)}
-        width="100vw"
+        width={isMobile ? '100%' : '100vw'}
         footer={
-          <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-            <Text type="secondary">拖动节点自由排布；从节点连接点拖拽到另一个节点即可画箭头</Text>
-            <Space>
+          <div className="workflow-flow-drawer-footer">
+            <Text type="secondary" className="workflow-flow-drawer-footer-note">拖动节点自由排布；从节点连接点拖拽到另一个节点即可画箭头</Text>
+            <Space wrap className="workflow-flow-drawer-footer-actions">
               <Button onClick={() => setDesignerOpen(false)}>关闭</Button>
               <Permission code="workflow:update">
                 <Button icon={<SaveOutlined />} onClick={() => saveDesigner()}>保存</Button>
@@ -506,12 +533,12 @@ export function WorkflowPage() {
                 <Button type="primary" icon={<PlayCircleOutlined />} onClick={() => saveDesigner('ACTIVE')}>保存并发布</Button>
               </Permission>
             </Space>
-          </Space>
+          </div>
         }
       >
         <div className="workflow-flow-designer">
           <Card size="small" title="节点类型" className="workflow-flow-sidebar">
-            <Space direction="vertical" style={{ width: '100%' }}>
+            <Space direction="vertical" className="workflow-node-type-grid" style={{ width: '100%' }}>
               {Object.entries(NODE_TYPE_CONFIG).map(([nodeType, item]) => (
                 <Button key={nodeType} block icon={item.icon} onClick={() => addNodeByType(nodeType)}>
                   {item.label}
@@ -634,7 +661,7 @@ export function WorkflowPage() {
       <ModalForm<WorkflowForm>
         title={editing ? '编辑工作流' : '新增工作流'}
         open={open}
-        width={640}
+        width={isMobile ? 'calc(100vw - 24px)' : 640}
         modalProps={{ destroyOnHidden: true, onCancel: () => { setOpen(false); setEditing(null); } }}
         initialValues={
           editing
