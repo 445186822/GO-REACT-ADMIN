@@ -261,6 +261,36 @@ paths:
       responses:
         "200":
           description: Deleted
+  /code-generator/tables:
+    get:
+      summary: List code generator eligible business tables
+      responses:
+        "200":
+          description: Business tables
+  /code-generator/tables/{table}/columns:
+    get:
+      summary: List code generator table columns
+      parameters:
+        - name: table
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Table columns
+  /code-generator/preview:
+    post:
+      summary: Preview generated CRUD source files
+      responses:
+        "200":
+          description: Generated file preview
+  /code-generator/generate:
+    post:
+      summary: Write generated CRUD source files
+      responses:
+        "200":
+          description: Generated files
   /files:
     get:
       summary: List uploaded files
@@ -661,6 +691,68 @@ paths:
       responses:
         "101":
           description: WebSocket upgrade
+  /announcements:
+    get:
+      summary: List announcements
+      responses:
+        "200":
+          description: Paged announcements
+    post:
+      summary: Create announcement
+      responses:
+        "201":
+          description: Created announcement ID
+  /announcements/unread-count:
+    get:
+      summary: Get unread announcement count
+      responses:
+        "200":
+          description: Unread count
+  /announcements/ws:
+    get:
+      summary: Announcement websocket endpoint
+      responses:
+        "101":
+          description: WebSocket upgrade
+  /announcements/{id}:
+    get:
+      summary: Get announcement detail
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Announcement detail
+    put:
+      summary: Update announcement
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Updated
+  /announcements/{id}/expire:
+    put:
+      summary: Expire announcement
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Expired
+  /announcements/{id}/read:
+    put:
+      summary: Mark announcement as read
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Marked read
+  /announcements/{id}/read-status:
+    get:
+      summary: Get announcement read status
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Read status
   /chat/sessions:
     get:
       summary: List chat sessions

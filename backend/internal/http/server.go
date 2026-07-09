@@ -7,9 +7,11 @@ import (
 	"enterprise-demo/backend/internal/config"
 	"enterprise-demo/backend/internal/http/middleware"
 	"enterprise-demo/backend/internal/http/response"
+	"enterprise-demo/backend/internal/modules/announcement"
 	"enterprise-demo/backend/internal/modules/auditlog"
 	"enterprise-demo/backend/internal/modules/auth"
 	"enterprise-demo/backend/internal/modules/chat"
+	"enterprise-demo/backend/internal/modules/codegen"
 	"enterprise-demo/backend/internal/modules/collaboration"
 	"enterprise-demo/backend/internal/modules/complexform"
 	"enterprise-demo/backend/internal/modules/customer"
@@ -64,7 +66,9 @@ func NewServer(cfg config.Config, log *slog.Logger, db *pgxpool.Pool) *echo.Echo
 	filemodule.NewHandler(db, cfg.JWTSecret, cfg.UploadDir).Register(api)
 	auditlog.NewHandler(db, cfg.JWTSecret).Register(api)
 	settings.NewHandler(db, cfg.JWTSecret).Register(api)
+	announcement.NewHandler(db, cfg.JWTSecret, cfg.AllowedOrigin).Register(api)
 	chat.NewHandler(db, cfg.JWTSecret, cfg.AllowedOrigin).Register(api)
+	codegen.NewHandler(db, cfg.JWTSecret).Register(api)
 	collaboration.NewHandler(db, cfg.JWTSecret, cfg.AllowedOrigin, collaboration.AIConfig{
 		AssistantEndpoint: cfg.AIAssistantEndpoint,
 		AssistantAPIKey:   cfg.AIAssistantAPIKey,

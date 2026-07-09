@@ -20,4 +20,8 @@ describe('useNotificationWebSocket source safeguards', () => {
 		expect(source).toContain('reconnectNow');
 		expect(source).toContain('return { connected, onMessage, reconnect: reconnectNow }');
 	});
+
+  it('connects to the announcement realtime channel', () => {
+    expect(source).toContain('/api/v1/announcements/ws?token=');
+  });
 });

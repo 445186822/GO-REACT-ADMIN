@@ -13,11 +13,15 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useShallow } from 'zustand/shallow';
 import { changePasswordApi } from '../api/auth';
-import { listNotifications, markAllNotificationsRead, markNotificationRead, unreadNotificationCount, type NotificationRow } from '../api/collaboration';
+import {
+  listAnnouncements,
+  markAnnouncementRead,
+  unreadAnnouncementCount,
+  type AnnouncementRow,
+} from '../api/announcement';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { FloatingAIAssistant } from '../components/FloatingAIAssistant';
-import { NotificationDetailModal } from '../features/collaboration/components/NotificationDetailModal';
-import { notificationNeedsRead, notificationReadPlaceholder } from '../features/collaboration/notificationDetail';
+import { AnnouncementDetailModal } from '../features/collaboration/components/AnnouncementDetailModal';
 import { renderMenuIconNode } from '../features/menu/menuIcons';
 import { useNotificationWebSocket } from '../hooks/useNotificationWebSocket';
 import { useAppearanceStore, type ContentPadding, type Density, type HeaderStyle, type LayoutMode, type PageTone, type SidebarTheme, type TabStyle } from '../store/appearanceStore';
@@ -36,10 +40,10 @@ export function BasicLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [openKeys, setOpenKeys] = useState<string[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [recentNotifications, setRecentNotifications] = useState<NotificationRow[]>([]);
+  const [recentNotifications, setRecentNotifications] = useState<AnnouncementRow[]>([]);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState(false);
-  const [selectedNotification, setSelectedNotification] = useState<NotificationRow | null>(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<AnnouncementRow | null>(null);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1024));
@@ -257,8 +261,8 @@ export function BasicLayout() {
     setNotificationLoading(true);
     try {
       const [count, page] = await Promise.all([
-        unreadNotificationCount(),
-        listNotifications({ page: 1, page_size: 5 }),
+        unreadAnnouncementCount(),
+        listAnnouncements({ page: 1, page_size: 5 }),
       ]);
       setUnreadCount(count);
       setRecentNotifications(page.items);
@@ -271,8 +275,13 @@ export function BasicLayout() {
   }, []);
 
   useEffect(() => {
+    if (!accessToken) {
+      setUnreadCount(0);
+      setRecentNotifications([]);
+      return;
+    }
     void refreshNotificationSummary();
-  }, [refreshNotificationSummary]);
+  }, [accessToken, refreshNotificationSummary]);
 
   // Shared WebSocket for notification badge
   const { onMessage: onWsMessage } = useNotificationWebSocket();
@@ -289,8 +298,8 @@ export function BasicLayout() {
 
   const openNotificationCenter = () => {
     setNotificationOpen(false);
-    setSelectedNotification(null);
-    navigate('/collaboration/notifications');
+    setSelectedAnnouncement(null);
+    navigate('/collaboration/announcements');
   };
 
   const handleNotificationOpenChange = (open: boolean) => {
@@ -300,23 +309,21 @@ export function BasicLayout() {
     }
   };
 
-  const handleNotificationClick = async (row: NotificationRow) => {
+  const handleAnnouncementClick = async (row: AnnouncementRow) => {
     setNotificationOpen(false);
-    setSelectedNotification(row);
-    if (notificationNeedsRead(row)) {
-      await markNotificationRead(row.id);
-      const readRow = { ...row, read_at: notificationReadPlaceholder() };
-      setSelectedNotification(readRow);
+    setSelectedAnnouncement(row);
+    if (!row.my_read_at) {
+      await markAnnouncementRead(row.id);
+      const readRow = { ...row, my_read_at: '__just_read__' };
+      setSelectedAnnouncement(readRow);
       setRecentNotifications((items) => items.map((item) => (item.id === row.id ? readRow : item)));
       await refreshNotificationSummary();
     }
   };
 
   const handleMarkAllNotificationsRead = async () => {
-    await markAllNotificationsRead();
-    setUnreadCount(0);
-    setRecentNotifications((items) => items.map((item) => ({ ...item, read_at: item.read_at ?? '已读' })));
-    message.success('已全部标记为已读');
+    // Mark all as read is handled per-announcement in the new system
+    message.info('请前往公告中心标记已读');
   };
 
   const handleAccountMenuClick: MenuProps['onClick'] = ({ key }) => {
@@ -398,14 +405,14 @@ export function BasicLayout() {
               <button
                 key={item.id}
                 type="button"
-                className={`notification-popover-item${item.read_at ? '' : ' notification-popover-item-unread'}`}
-                onClick={() => void handleNotificationClick(item)}
+                className={`notification-popover-item${item.my_read_at ? '' : ' notification-popover-item-unread'}`}
+                onClick={() => void handleAnnouncementClick(item)}
               >
                 <span className="notification-popover-dot" />
                 <span className="notification-popover-main">
                   <span className="notification-popover-title">{item.title}</span>
                   <span className="notification-popover-meta">
-                    {item.source_module || item.notif_type} · {item.created_at}
+                    {item.category} · {item.created_at}
                   </span>
                 </span>
               </button>
@@ -624,11 +631,10 @@ export function BasicLayout() {
               <Outlet key={`${location.pathname}:${pageRefreshKey}`} />
             </ErrorBoundary>
           </div>
-          <NotificationDetailModal
-            open={Boolean(selectedNotification)}
-            notification={selectedNotification}
-            onClose={() => setSelectedNotification(null)}
-            onOpenCenter={openNotificationCenter}
+          <AnnouncementDetailModal
+            open={Boolean(selectedAnnouncement)}
+            announcement={selectedAnnouncement}
+            onClose={() => setSelectedAnnouncement(null)}
           />
           <Modal
             title="修改密码"

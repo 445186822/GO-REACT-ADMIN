@@ -47,7 +47,7 @@ function connect(token: string) {
   activeToken = token;
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const ws = new WebSocket(
-    `${protocol}//${window.location.host}/api/v1/notifications/ws?token=${encodeURIComponent(token)}`,
+    `${protocol}//${window.location.host}/api/v1/announcements/ws?token=${encodeURIComponent(token)}`,
   );
 
   ws.onopen = () => {

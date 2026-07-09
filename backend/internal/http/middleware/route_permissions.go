@@ -45,6 +45,14 @@ func PermissionForRequest(method string, rawPath string) string {
 		return permissionByMethod(method, "complex-form:view", "complex-form:create", "", "")
 	case path == "/complex-forms/:id":
 		return permissionByMethod(method, "", "", "complex-form:update", "complex-form:delete")
+	case strings.HasPrefix(path, "/code-generator"):
+		if method == http.MethodGet {
+			return "code-generator:view"
+		}
+		if method == http.MethodPost {
+			return "code-generator:create"
+		}
+		return PermissionDeny
 	case path == "/files":
 		return "file:view"
 	case path == "/files/upload":
@@ -115,6 +123,11 @@ func PermissionForRequest(method string, rawPath string) string {
 		return "ai:send"
 	case strings.HasPrefix(path, "/chat"):
 		return "chat:view"
+	case strings.HasPrefix(path, "/announcements"):
+		if method == http.MethodPost {
+			return "notification:create"
+		}
+		return "notification:view"
 	default:
 		return PermissionDeny
 	}

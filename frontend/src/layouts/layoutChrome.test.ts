@@ -6,7 +6,7 @@ const css = readFileSync(resolve(process.cwd(), 'src/styles/global.css'), 'utf8'
 const featureSources = [
   'src/features/customer/pages/CustomerListPage.tsx',
   'src/features/collaboration/pages/MessageTemplatePage.tsx',
-  'src/features/collaboration/pages/NotificationCenterPage.tsx',
+  'src/features/collaboration/pages/AnnouncementCenterPage.tsx',
   'src/features/knowledgebase/pages/KnowledgeBasePage.tsx',
   'src/features/settings/pages/SettingsPage.tsx',
   'src/features/collaboration/pages/WorkflowPage.tsx',

@@ -1,8 +1,10 @@
 package middleware
 
 import (
+	"context"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
@@ -24,12 +26,17 @@ func recordAudit(c echo.Context, db *pgxpool.Pool, handlerErr error) {
 		return
 	}
 
+	auditCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
 	requestID, _ := c.Get(RequestIDKey).(string)
 	userID := CurrentUserID(c)
 	var username *string
-	if userID > 0 {
+	if value := CurrentUsername(c); value != "" {
+		username = &value
+	} else if userID > 0 {
 		var value string
-		if err := db.QueryRow(req.Context(), `SELECT username FROM sys_users WHERE id = $1`, userID).Scan(&value); err == nil {
+		if err := db.QueryRow(auditCtx, `SELECT username FROM sys_users WHERE id = $1`, userID).Scan(&value); err == nil {
 			username = &value
 		}
 	}
@@ -45,7 +52,7 @@ func recordAudit(c echo.Context, db *pgxpool.Pool, handlerErr error) {
 		errorMessage = handlerErr.Error()
 	}
 
-	_, _ = db.Exec(req.Context(), `
+	_, _ = db.Exec(auditCtx, `
 INSERT INTO sys_audit_logs (
   request_id, user_id, username, action, resource, resource_id, method, path, ip, user_agent,
   response_code, success, error_message

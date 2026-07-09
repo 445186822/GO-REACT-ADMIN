@@ -47,6 +47,34 @@ func TestSeedMenusIncludesComplexFormBusinessExample(t *testing.T) {
 	}
 }
 
+func TestSeedMenusIncludesCodeGeneratorBusinessExample(t *testing.T) {
+	required := []string{
+		"('business', 'page', 'code-generator:view', '快速生成代码'",
+		"'/business/code-generator'",
+		"'CodeGeneratorPage'",
+		"('code-generator:view', 'button', 'code-generator:create', '生成代码'",
+	}
+	for _, text := range required {
+		if !strings.Contains(seedMenusSQL, text) {
+			t.Fatalf("seedMenusSQL must contain %q", text)
+		}
+	}
+}
+
+func TestSeedMenusUsesAnnouncementCenterForNotifications(t *testing.T) {
+	required := []string{
+		"('collaboration', 'page', 'notification:view', '公告中心'",
+		"'/collaboration/announcements'",
+		"'AnnouncementCenterPage'",
+		"('notification:view', 'button', 'notification:create', '创建公告'",
+	}
+	for _, text := range required {
+		if !strings.Contains(seedMenusSQL, text) {
+			t.Fatalf("seedMenusSQL must contain %q", text)
+		}
+	}
+}
+
 func TestValidateMigrationFilesRejectsNewDuplicateNumbers(t *testing.T) {
 	err := validateMigrationFiles([]string{
 		"migrations/000020_runtime.up.sql",

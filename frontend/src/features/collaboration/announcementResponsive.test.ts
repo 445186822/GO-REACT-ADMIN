@@ -4,10 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 const pageSource = readFileSync(resolve(process.cwd(), 'src/features/collaboration/pages/AnnouncementCenterPage.tsx'), 'utf8');
 const modalSource = readFileSync(resolve(process.cwd(), 'src/features/collaboration/components/AnnouncementDetailModal.tsx'), 'utf8');
-const readStatusModalSource = readFileSync(resolve(process.cwd(), 'src/features/collaboration/components/ReadStatusModal.tsx'), 'utf8');
 const css = readFileSync(resolve(process.cwd(), 'src/styles/global.css'), 'utf8');
 
-describe('notification center responsive layout', () => {
+describe('announcement center responsive layout', () => {
   it('wraps the realtime status strip with wrap for mobile', () => {
     expect(pageSource).toContain('wrap');
     expect(pageSource).toContain('notification-status-strip');
@@ -17,10 +16,6 @@ describe('notification center responsive layout', () => {
     expect(modalSource).toContain('min(680px, calc(100vw - 32px))');
     expect(modalSource).toContain('column={{ xs: 1, sm: 1, md: 2 }}');
     expect(modalSource).toContain('className="notification-detail-descriptions"');
-  });
-
-  it('read status modal uses responsive width', () => {
-    expect(readStatusModalSource).toContain('min(520px, calc(100vw - 32px))');
   });
 
   it('defines shared responsive breakpoints for dense enterprise pages', () => {

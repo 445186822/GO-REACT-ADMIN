@@ -241,7 +241,7 @@ const FLOW_DEFINITIONS: FlowDefinition[] = [
       node('runtime', 780, 300, brief('runtime engine', '节点运行时', 'backend', <BranchesOutlined />, ['backend/internal/modules/collaboration/workflow_runtime.go', 'backend/internal/modules/collaboration/approval_runtime_store.go'], ['buildApprovalStartPlan()', 'actionRuntimeApproval()'], '计算当前节点、下一节点、审批动作和状态推进。', ['流程卡住看 approval_instance_nodes。'])),
       node('business-map', 520, 300, brief('业务状态映射', 'workflow bindings', 'backend', <UserSwitchOutlined />, ['backend/internal/modules/collaboration/workflow_business.go', 'backend/internal/modules/collaboration/workflow_business_store.go'], ['ApplyBusinessStatus()', 'SaveWorkflowBinding()'], '把流程状态同步到业务对象状态。', ['业务状态不变看 adapter_code。'])),
       node('todo', 260, 300, brief('TodoCenterPage', '待办中心', 'frontend', <TableOutlined />, ['frontend/src/features/collaboration/pages/TodoCenterPage.tsx'], ['listTodos()', 'actionApproval()'], '展示当前用户待办并支持处理。', ['待办缺失看 assignee/角色匹配。'])),
-      node('notification', 0, 300, brief('通知中心', '消息提醒', 'async', <BellOutlined />, ['backend/internal/modules/collaboration/handler.go', 'frontend/src/features/collaboration/pages/NotificationCenterPage.tsx'], ['CreateNotification()', 'listNotifications()'], '审批和任务产生通知，前端展示未读提醒。', ['通知不更新看 WebSocket 和 sys_notifications。'])),
+      node('notification', 0, 300, brief('公告中心', '消息提醒', 'async', <BellOutlined />, ['backend/internal/modules/announcement/handler.go', 'frontend/src/features/collaboration/pages/AnnouncementCenterPage.tsx'], ['CreateAnnouncement()', 'listAnnouncements()'], '公告发布和阅读进度追踪。', ['公告不更新看 announcement_recipients。'])),
       node('workflow-db', 520, 550, brief('流程表', 'workflow_* / approval_*', 'data', <DatabaseOutlined />, ['backend/migrations/000004_collaboration.up.sql', 'backend/migrations/000020_approval_runtime_nodes.up.sql'], ['workflow_definitions', 'approval_instances', 'approval_instance_nodes'], '保存流程定义、实例、节点和审批动作。', ['直接查实例状态定位卡点。'])),
     ],
     edges: [
@@ -271,11 +271,11 @@ const FLOW_DEFINITIONS: FlowDefinition[] = [
     tags: ['通知', 'WebSocket', '未读数'],
     nodes: [
       node('layout-badge', 0, 60, brief('Header Badge', '未读红点', 'frontend', <BellOutlined />, ['frontend/src/layouts/BasicLayout.tsx'], ['refreshNotificationSummary()', 'useNotificationWebSocket()'], '顶部通知图标展示未读数和最近通知。', ['红点不变看 WebSocket 消息。'])),
-      node('notification-page', 260, 60, brief('NotificationCenterPage', '通知列表', 'frontend', <TableOutlined />, ['frontend/src/features/collaboration/pages/NotificationCenterPage.tsx'], ['listNotifications()', 'markNotificationRead()'], '展示通知列表、标记已读、创建通知。', ['列表不更新看接口分页。'])),
+      node('notification-page', 260, 60, brief('AnnouncementCenterPage', '公告列表', 'frontend', <TableOutlined />, ['frontend/src/features/collaboration/pages/AnnouncementCenterPage.tsx'], ['listAnnouncements()', 'getAnnouncementReadStatus()'], '展示公告列表、已读列表、阅读进度、过期管理。', ['列表不更新看接口分页。'])),
       node('ws-hook', 520, 60, brief('useNotificationWebSocket', '前端连接', 'async', <CloudServerOutlined />, ['frontend/src/hooks/useNotificationWebSocket.ts'], ['connect()', 'onMessage()'], '维护通知 WebSocket 连接和消息分发。', ['断连看 ws URL 和 token。'])),
-      node('collab-notif', 780, 60, brief('通知接口', 'notifications', 'backend', <ApiOutlined />, ['backend/internal/modules/collaboration/handler.go'], ['ListNotifications()', 'CreateNotification()', 'MarkNotificationRead()'], '处理通知增删改查和未读计数。', ['未读数错看 read_at。'])),
-      node('notif-db', 520, 310, brief('sys_notifications', '通知表', 'data', <DatabaseOutlined />, ['backend/migrations/000004_collaboration.up.sql'], ['INSERT sys_notifications', 'UPDATE read_at'], '保存通知内容、接收人和已读时间。', ['查 recipient_id 是否正确。'])),
-      node('producer', 260, 310, brief('业务生产者', '审批 / 定时任务', 'backend', <BranchesOutlined />, ['backend/internal/modules/collaboration/handler.go', 'backend/internal/modules/scheduler/engine.go'], ['INSERT sys_notifications'], '审批、定时任务等模块写入通知。', ['如果表里没数据，查生产者逻辑。'])),
+      node('collab-notif', 780, 60, brief('公告接口', 'announcements', 'backend', <ApiOutlined />, ['backend/internal/modules/announcement/handler.go'], ['ListAnnouncements()', 'CreateAnnouncement()', 'ReadStatus()'], '处理公告增删改查、阅读状态和过期。', ['阅读状态错看 announcement_recipients。'])),
+      node('notif-db', 520, 310, brief('announcements', '公告表', 'data', <DatabaseOutlined />, ['backend/migrations/000025_announcements.up.sql'], ['INSERT announcements', 'INSERT announcement_recipients'], '保存公告内容、接收人、阅读记录和过期时间。', ['查 announcement_recipients 是否正确。'])),
+      node('producer', 260, 310, brief('业务生产者', '审批 / 定时任务', 'backend', <BranchesOutlined />, ['backend/internal/modules/announcement/handler.go', 'backend/internal/modules/scheduler/engine.go'], ['INSERT announcements'], '审批、定时任务等模块发布公告。', ['如果表里没数据，查生产者逻辑。'])),
     ],
     edges: [
       edge('layout-badge', 'ws-hook', '订阅'),
@@ -286,11 +286,11 @@ const FLOW_DEFINITIONS: FlowDefinition[] = [
       edge('notif-db', 'layout-badge', '未读数', true),
     ],
     timeline: [
-      ['业务写通知', '审批或定时任务写入 sys_notifications。'],
+      ['业务写公告', '审批或定时任务写入 announcements。'],
       ['前端订阅', 'BasicLayout 使用 WebSocket 接收变化。'],
-      ['刷新未读数', '收到事件后调用 unreadNotificationCount。'],
-      ['进入通知中心', 'NotificationCenterPage 分页查询通知。'],
-      ['标记已读', '更新 read_at 并刷新 badge。'],
+      ['刷新未读数', '收到事件后调用 unreadAnnouncementCount。'],
+      ['进入公告中心', 'AnnouncementCenterPage 分页查询公告。'],
+      ['标记已读', '更新 announcement_recipients.read_at 并刷新 badge。'],
     ],
   },
   {

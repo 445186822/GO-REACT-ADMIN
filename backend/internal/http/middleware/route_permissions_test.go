@@ -48,3 +48,22 @@ func TestPermissionForComplexFormRequests(t *testing.T) {
 		}
 	}
 }
+
+func TestPermissionForCodeGeneratorRequests(t *testing.T) {
+	cases := []struct {
+		method string
+		path   string
+		want   string
+	}{
+		{http.MethodGet, "/api/v1/code-generator/tables", "code-generator:view"},
+		{http.MethodGet, "/api/v1/code-generator/tables/biz_customers/columns", "code-generator:view"},
+		{http.MethodPost, "/api/v1/code-generator/preview", "code-generator:create"},
+		{http.MethodPost, "/api/v1/code-generator/generate", "code-generator:create"},
+	}
+
+	for _, tc := range cases {
+		if got := PermissionForRequest(tc.method, tc.path); got != tc.want {
+			t.Fatalf("PermissionForRequest(%s, %s) = %q, want %q", tc.method, tc.path, got, tc.want)
+		}
+	}
+}
