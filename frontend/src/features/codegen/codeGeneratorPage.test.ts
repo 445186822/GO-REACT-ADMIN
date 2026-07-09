@@ -15,7 +15,9 @@ describe('code generator page', () => {
   it('has preview and confirmed generation actions', () => {
     expect(pageSource).toContain('生成预览');
     expect(pageSource).toContain('确认生成');
-    expect(pageSource).toContain('Modal.confirm');
+    expect(pageSource).toContain('App.useApp()');
+    expect(pageSource).toContain('modal.confirm');
+    expect(pageSource).not.toContain('Modal.confirm');
   });
 
   it('renders generated file preview before writing files', () => {

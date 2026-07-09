@@ -1,6 +1,6 @@
 import { CodeOutlined, FileTextOutlined, ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { ProColumns, ProForm, ProFormSelect, ProFormSwitch, ProFormText, ProTable } from '@ant-design/pro-components';
-import { Alert, Button, Modal, Space, Tabs, Tag, Typography } from 'antd';
+import { Alert, App, Button, Space, Tabs, Tag, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import {
   generateCodegen,
@@ -26,6 +26,7 @@ type CodegenForm = {
 };
 
 export function CodeGeneratorPage() {
+  const { modal } = App.useApp();
   const [tables, setTables] = useState<CodegenTable[]>([]);
   const [selectedTable, setSelectedTable] = useState('');
   const [columns, setColumns] = useState<CodegenColumn[]>([]);
@@ -131,7 +132,7 @@ export function CodeGeneratorPage() {
       message.warning('请先生成预览');
       return;
     }
-    Modal.confirm({
+    modal.confirm({
       title: '确认生成代码?',
       content: '将根据当前预览写入源码文件。已有文件默认不会覆盖。',
       okText: '确认生成',

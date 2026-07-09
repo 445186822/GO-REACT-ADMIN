@@ -24,4 +24,16 @@ describe('system mobile list pages', () => {
     expect(role).toContain('aria-label="更多操作"');
     expect(role).toContain('icon={<MoreOutlined />}');
   });
+
+  it('uses current Ant Design modal destroy prop names', () => {
+    const checkedPages = [
+      'src/features/role/pages/RoleListPage.tsx',
+      'src/features/datadict/pages/DataDictPage.tsx',
+      'src/features/scheduler/pages/SchedulerPage.tsx',
+    ];
+    for (const path of checkedPages) {
+      const source = readFileSync(resolve(process.cwd(), path), 'utf8');
+      expect(source).not.toContain('destroyOnClose');
+    }
+  });
 });

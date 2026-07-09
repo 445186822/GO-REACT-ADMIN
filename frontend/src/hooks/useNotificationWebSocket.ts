@@ -6,6 +6,7 @@ type MessageHandler = (event: { event: string; count?: number }) => void;
 // Module-level shared WebSocket state
 let sharedWs: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let disconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectDelay = 1000;
 const MAX_RECONNECT_DELAY = 30000;
 let listeners = new Set<MessageHandler>();
@@ -27,6 +28,7 @@ function notifyConnectionChange(connected: boolean) {
 }
 
 function connect(token: string) {
+  clearDisconnectTimer();
   if (
     sharedWs &&
     activeToken === token &&
@@ -81,6 +83,13 @@ function connect(token: string) {
   sharedWs = ws;
 }
 
+function clearDisconnectTimer() {
+  if (disconnectTimer) {
+    clearTimeout(disconnectTimer);
+    disconnectTimer = null;
+  }
+}
+
 function scheduleReconnect() {
   if (reconnectTimer) return;
   if (!activeToken) return;
@@ -96,6 +105,7 @@ function scheduleReconnect() {
 }
 
 function disconnect() {
+  clearDisconnectTimer();
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -110,6 +120,16 @@ function disconnect() {
   sharedConnected = false;
   activeToken = null;
   reconnectDelay = 1000;
+}
+
+function scheduleDisconnect() {
+  clearDisconnectTimer();
+  disconnectTimer = setTimeout(() => {
+    disconnectTimer = null;
+    if (listeners.size === 0) {
+      disconnect();
+    }
+  }, 250);
 }
 
 function reconnect(token: string) {
@@ -141,6 +161,7 @@ export function useNotificationWebSocket() {
     };
 
     listeners.add(handler);
+    clearDisconnectTimer();
 
     // Ensure connection is active
     if (!sharedWs || (sharedWs.readyState !== WebSocket.OPEN && sharedWs.readyState !== WebSocket.CONNECTING)) {
@@ -158,7 +179,7 @@ export function useNotificationWebSocket() {
       clearInterval(interval);
       // If no more listeners, clean up connection
       if (listeners.size === 0) {
-        disconnect();
+        scheduleDisconnect();
       }
     };
   }, [token]);

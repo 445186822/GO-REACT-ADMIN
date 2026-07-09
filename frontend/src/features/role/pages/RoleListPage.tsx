@@ -1,6 +1,6 @@
 import { DeleteOutlined, EditOutlined, MoreOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons';
 import type { ProColumns } from '@ant-design/pro-components';
-import { Button, Dropdown, Form, Input, Modal, Popconfirm, Select, Space, Spin, Tag, Tree, Typography, type MenuProps } from 'antd';
+import { App, Button, Dropdown, Form, Input, Modal, Popconfirm, Select, Space, Spin, Tag, Tree, Typography, type MenuProps } from 'antd';
 import { message } from '../../../utils/message';
 import type { DataNode } from 'antd/es/tree';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -41,6 +41,7 @@ function buildMenuTree(flat: MenuRow[]): DataNode[] {
 /* ========== Page ========== */
 
 export function RoleListPage() {
+  const { modal } = App.useApp();
   const perms = useAuthStore((s) => s.user?.permissions ?? []);
   const canUpdate = perms.includes('role:update');
   const canCreate = perms.includes('role:create');
@@ -133,7 +134,7 @@ export function RoleListPage() {
   }
 
   function confirmDeleteRole(row: RoleRow) {
-    Modal.confirm({ title: `确认删除角色「${row.name}」？`, okText: '删除', okButtonProps: { danger: true }, cancelText: '取消', onOk: () => handleDelete(row.id) });
+    modal.confirm({ title: `确认删除角色「${row.name}」？`, okText: '删除', okButtonProps: { danger: true }, cancelText: '取消', onOk: () => handleDelete(row.id) });
   }
 
   // ---------- columns ----------
@@ -198,7 +199,7 @@ export function RoleListPage() {
       {/* ===== create / edit modal ===== */}
       <Modal
         title={editingRole ? `编辑角色 — ${editingRole.name}` : '新建角色'}
-        open={modalOpen} onCancel={closeModal} width={640} destroyOnClose
+        open={modalOpen} onCancel={closeModal} width={640} destroyOnHidden
         footer={<Button type="primary" icon={<SaveOutlined />} onClick={() => void handleSave()} loading={saving}>保存</Button>}
       >
         <Form form={form} layout="vertical">

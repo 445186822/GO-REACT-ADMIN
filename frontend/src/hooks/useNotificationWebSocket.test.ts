@@ -21,6 +21,12 @@ describe('useNotificationWebSocket source safeguards', () => {
 		expect(source).toContain('return { connected, onMessage, reconnect: reconnectNow }');
 	});
 
+	it('defers disconnect cleanup to avoid React StrictMode closing connecting sockets immediately', () => {
+		expect(source).toContain('disconnectTimer');
+		expect(source).toContain('scheduleDisconnect');
+		expect(source).toContain('clearDisconnectTimer');
+	});
+
   it('connects to the announcement realtime channel', () => {
     expect(source).toContain('/api/v1/announcements/ws?token=');
   });

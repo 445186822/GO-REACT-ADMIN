@@ -18,6 +18,7 @@ const WS_MAX_RETRIES = 10;
 let ws: WebSocket | null = null;
 let retryCount = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let disconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let handlerRefs = new Set<MessageHandler>();
 let activeToken: string | null = null;
 let wsConnected = false;
@@ -33,6 +34,7 @@ function notifyHandlers(msg: WSMessage) {
 }
 
 function connect(token: string) {
+  clearDisconnectTimer();
   if (ws && ws.readyState === WebSocket.OPEN && activeToken === token) {
     return;
   }
@@ -88,6 +90,13 @@ function connect(token: string) {
   ws = newWs;
 }
 
+function clearDisconnectTimer() {
+  if (disconnectTimer) {
+    clearTimeout(disconnectTimer);
+    disconnectTimer = null;
+  }
+}
+
 function scheduleReconnect() {
   if (reconnectTimer) return;
   if (!activeToken) return;
@@ -107,6 +116,7 @@ function scheduleReconnect() {
 }
 
 function disconnect() {
+  clearDisconnectTimer();
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -121,6 +131,16 @@ function disconnect() {
   wsConnected = false;
   activeToken = null;
   retryCount = 0;
+}
+
+function scheduleDisconnect() {
+  clearDisconnectTimer();
+  disconnectTimer = setTimeout(() => {
+    disconnectTimer = null;
+    if (handlerRefs.size === 0) {
+      disconnect();
+    }
+  }, 250);
 }
 
 /**
@@ -154,6 +174,7 @@ export function useChatWebSocket() {
     };
 
     handlerRefs.add(handler);
+    clearDisconnectTimer();
 
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       connect(token);
@@ -168,7 +189,7 @@ export function useChatWebSocket() {
       handlerRefs.delete(handler);
       clearInterval(interval);
       if (handlerRefs.size === 0) {
-        disconnect();
+        scheduleDisconnect();
       }
     };
   }, [token]);

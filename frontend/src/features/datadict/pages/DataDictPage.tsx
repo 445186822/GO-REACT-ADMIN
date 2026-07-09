@@ -277,7 +277,7 @@ export function DataDictPage() {
             return true;
           } catch { message.error('保存字典类型失败，请稍后重试'); return false; }
         }}
-        modalProps={{ destroyOnClose: true }}
+        modalProps={{ destroyOnHidden: true }}
       >
         <ProFormText name="code" label="编码" rules={[{ required: true }]} disabled={!!editingType} />
         <ProFormText name="name" label="名称" rules={[{ required: true }]} />
@@ -299,7 +299,7 @@ export function DataDictPage() {
             return true;
           } catch { message.error('保存字典项失败，请稍后重试'); return false; }
         }}
-        modalProps={{ destroyOnClose: true }}
+        modalProps={{ destroyOnHidden: true }}
       >
         <ProFormText name="label" label="显示名称" rules={[{ required: true }]} />
         <ProFormText name="value" label="值" rules={[{ required: true }]} />

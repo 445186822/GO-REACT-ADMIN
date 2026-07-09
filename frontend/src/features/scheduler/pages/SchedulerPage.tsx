@@ -170,7 +170,7 @@ export function SchedulerPage() {
             return false;
           }
         }}
-        modalProps={{ destroyOnClose: true }}
+        modalProps={{ destroyOnHidden: true }}
       >
         <ProFormText name="name" label="任务名称" rules={[{ required: true }]} />
         <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
