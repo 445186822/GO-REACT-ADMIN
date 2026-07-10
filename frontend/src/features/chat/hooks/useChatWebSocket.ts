@@ -35,7 +35,11 @@ function notifyHandlers(msg: WSMessage) {
 
 function connect(token: string) {
   clearDisconnectTimer();
-  if (ws && ws.readyState === WebSocket.OPEN && activeToken === token) {
+  if (
+    ws &&
+    activeToken === token &&
+    (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)
+  ) {
     return;
   }
 

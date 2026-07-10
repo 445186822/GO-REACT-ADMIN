@@ -767,19 +767,30 @@ function attachmentFileID(value: string): number {
 
 function AuthenticatedImage({ fileID, alt }: { fileID: number; alt: string }) {
   const [url, setUrl] = useState('');
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let revoked = '';
-    if (!fileID) return undefined;
-    void createFileObjectUrl(fileID).then((objectUrl) => {
-      revoked = objectUrl;
-      setUrl(objectUrl);
-    });
+    setUrl('');
+    setFailed(false);
+    if (!fileID) {
+      setFailed(true);
+      return undefined;
+    }
+    void createFileObjectUrl(fileID)
+      .then((objectUrl) => {
+        revoked = objectUrl;
+        setUrl(objectUrl);
+      })
+      .catch(() => {
+        setFailed(true);
+      });
     return () => {
       if (revoked) URL.revokeObjectURL(revoked);
     };
   }, [fileID]);
 
+  if (failed) return <Text type="secondary">图片已失效</Text>;
   if (!url) return <Spin size="small" />;
   return <Image src={url} alt={alt} className="chat-bubble-image" />;
 }

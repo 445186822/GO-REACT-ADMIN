@@ -366,6 +366,10 @@ func (h *Handler) ListMessages(c echo.Context) error {
 	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
 		messages[i], messages[j] = messages[j], messages[i]
 	}
+	messages, err = h.hydrateMessageAttachments(c.Request().Context(), messages)
+	if err != nil {
+		return err
+	}
 	reads, _ := h.participantReadMap(c.Request().Context(), sessionID)
 	for i := range messages {
 		messages[i].ReadCount = readCountForMessage(messages[i].ID, messages[i].SenderID, reads)

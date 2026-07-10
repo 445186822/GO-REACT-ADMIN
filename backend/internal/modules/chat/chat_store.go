@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"enterprise-demo/backend/internal/http/response"
@@ -143,7 +144,14 @@ func (h *Handler) loadSharedFiles(ctx context.Context, sessionID int64) ([]Messa
 		}
 		files = append(files, msg)
 	}
-	return files, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	files, err = h.hydrateMessageAttachments(ctx, files)
+	if err != nil {
+		return nil, err
+	}
+	return availableSharedFiles(files), nil
 }
 
 func (h *Handler) participantReadMap(ctx context.Context, sessionID int64) (map[int64]int64, error) {
@@ -189,4 +197,94 @@ func (h *Handler) insertMessage(ctx context.Context, sessionID int64, userID int
 
 	_, _ = h.db.Exec(ctx, `UPDATE chat_sessions SET updated_at = now() WHERE id = $1`, sessionID)
 	return msg, nil
+}
+
+func (h *Handler) hydrateMessageAttachments(ctx context.Context, messages []MessageRow) ([]MessageRow, error) {
+	ids := make([]int64, 0)
+	seen := make(map[int64]struct{})
+	for _, msg := range messages {
+		if msg.MessageType != "IMAGE" && msg.MessageType != "FILE" {
+			continue
+		}
+		id, ok := attachmentFileID(msg.AttachmentURL)
+		if !ok {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		markMissingMessageAttachments(messages, map[int64]struct{}{})
+		return messages, nil
+	}
+
+	rows, err := h.db.Query(ctx, `SELECT id FROM sys_files WHERE id = ANY($1) AND deleted_at IS NULL`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	existing := make(map[int64]struct{})
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		existing[id] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	markMissingMessageAttachments(messages, existing)
+	return messages, nil
+}
+
+func markMissingMessageAttachments(messages []MessageRow, existingFileIDs map[int64]struct{}) {
+	for index := range messages {
+		msg := &messages[index]
+		if msg.MessageType != "IMAGE" && msg.MessageType != "FILE" {
+			continue
+		}
+		id, ok := attachmentFileID(msg.AttachmentURL)
+		if !ok {
+			msg.AttachmentURL = nil
+			continue
+		}
+		if _, exists := existingFileIDs[id]; !exists {
+			msg.AttachmentURL = nil
+		}
+	}
+}
+
+func availableSharedFiles(messages []MessageRow) []MessageRow {
+	files := make([]MessageRow, 0, len(messages))
+	for _, msg := range messages {
+		if msg.AttachmentURL != nil {
+			files = append(files, msg)
+		}
+	}
+	return files
+}
+
+func attachmentFileID(value *string) (int64, bool) {
+	if value == nil {
+		return 0, false
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return 0, false
+	}
+	if id, err := strconv.ParseInt(trimmed, 10, 64); err == nil && id > 0 {
+		return id, true
+	}
+	if !strings.Contains(trimmed, "/files/") {
+		return 0, false
+	}
+	after := strings.SplitN(trimmed, "/files/", 2)[1]
+	idPart := strings.SplitN(after, "/", 2)[0]
+	id, err := strconv.ParseInt(idPart, 10, 64)
+	return id, err == nil && id > 0
 }

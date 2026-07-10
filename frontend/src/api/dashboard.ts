@@ -21,6 +21,7 @@ export interface DashboardStats {
   today_requests: number;
   pending_approvals: number;
   running_tasks: number;
+  pending_todos: number;
   request_trend: RequestTrendItem[];
   customer_level_dist: CustomerLevelDist[];
   approval_status_dist: ApprovalStatusDist[];

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Card, Col, Row, Skeleton, Statistic, Typography } from 'antd';
 import {
+  CheckSquareOutlined,
   ClockCircleOutlined,
   PlayCircleOutlined,
   ReloadOutlined,
@@ -25,11 +27,12 @@ const MODULE_OVERVIEW = [
 
 /** Stat card descriptors */
 const STAT_CARDS = [
-  { title: '用户数', icon: <UserOutlined />, field: 'user_count' as const },
-  { title: '客户数', icon: <TeamOutlined />, field: 'customer_count' as const },
-  { title: '今日请求', icon: <RocketOutlined />, field: 'today_requests' as const },
-  { title: '待审批', icon: <ClockCircleOutlined />, field: 'pending_approvals' as const },
-  { title: '运行任务', icon: <PlayCircleOutlined />, field: 'running_tasks' as const },
+  { title: '用户数', icon: <UserOutlined />, field: 'user_count' as const, path: '/system/users' },
+  { title: '客户数', icon: <TeamOutlined />, field: 'customer_count' as const, path: '/business/customers' },
+  { title: '今日请求', icon: <RocketOutlined />, field: 'today_requests' as const, path: '/system/monitor' },
+  { title: '待审批', icon: <ClockCircleOutlined />, field: 'pending_approvals' as const, path: '/collaboration/approvals' },
+  { title: '运行任务', icon: <PlayCircleOutlined />, field: 'running_tasks' as const, path: '/system/scheduler' },
+  { title: '待办事项', icon: <CheckSquareOutlined />, field: 'pending_todos' as const, path: '/collaboration/todos' },
 ];
 
 /** Map backend status code to Chinese label */
@@ -66,6 +69,7 @@ function useDashboardStats() {
 
 export function DashboardPage() {
   const { stats, loading, error, retry } = useDashboardStats();
+  const navigate = useNavigate();
 
   /* ---- ECharts options ---- */
 
@@ -222,8 +226,12 @@ export function DashboardPage() {
       {/* ---- Stat cards ---- */}
       <Row gutter={[16, 16]}>
         {STAT_CARDS.map((card) => (
-          <Col xs={24} sm={12} lg={6} key={card.field}>
-            <Card>
+          <Col xs={24} sm={12} lg={8} key={card.field}>
+            <Card
+              hoverable
+              onClick={() => navigate(card.path)}
+              styles={{ body: { minHeight: 92 } }}
+            >
               {loading ? (
                 <Skeleton active paragraph={false} />
               ) : (
